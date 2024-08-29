@@ -1,6 +1,6 @@
 import unittest
 import csv
-from csv_processor import process_csv_file
+from processor import process_csv_file
 
 class TestCSVProcessing(unittest.TestCase):
     def test_process_csv_file(self):

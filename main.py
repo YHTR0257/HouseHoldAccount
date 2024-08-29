@@ -1,4 +1,3 @@
-# from balancesheet.balance_sheet import BalanceSheet
 from processor.csv_processor import CSVProcessor
 
 init_data_path = 'datas/test.csv'
@@ -22,12 +21,7 @@ csv_processor.process_csv()
 バランスシートを生成して保存する
 """
 
-# BalanceSheetクラスのインスタンスを作成
-balance_sheet = BalanceSheet(input_file_path)
-
 # バランスシートの生成と保存
-balance_sheet.make_balance_sheet(output_summary_path)
-carryover_df = balance_sheet.carryover_df
 print(carryover_df)
 
 # 繰り越しデータを加えたCSVを完成版のものとして保存
