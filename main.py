@@ -1,4 +1,4 @@
-from balancesheet.balance_sheet import BalanceSheet
+# from balancesheet.balance_sheet import BalanceSheet
 from processor.csv_processor import CSVProcessor
 
 init_data_path = 'datas/test.csv'
