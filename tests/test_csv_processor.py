@@ -18,9 +18,18 @@ class TestCSVProcessing(unittest.TestCase):
     def test_pivot_csv_file(self):
         file_path = '/c:/Users/grand/Documents/HouseholdAccount/datas/test.csv'
         expected_data = {
-            '2024-03': {'Credit Card Debt': -2000, 'UFJ': -5041},
-            '2024-04': {'Credit Card Debt': -1000, 'UFJ': -1000},
-            # Add more expected data here
+            '2024-03': {'TotalAssets': -7500,
+                'TotalLiabilities': -1500,
+                'TotalIncome': -5500,
+                'TotalExpenses': 14500,
+                'NetIncome': 9000,
+                'TotalEquity': -9000},
+            '2024-04': {'TotalAssets': -7500,
+                'TotalLiabilities': -1500,
+                'TotalIncome': -5500,
+                'TotalExpenses': 14500,
+                'NetIncome': 9000,
+                'TotalEquity': -9000}
         }
 
         actual_data = process_csv_file(file_path)
