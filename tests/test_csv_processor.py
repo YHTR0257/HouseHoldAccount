@@ -15,5 +15,16 @@ class TestCSVProcessing(unittest.TestCase):
         actual_data = process_csv_file(file_path)
         self.assertEqual(actual_data, expected_data)
 
+    def test_pivot_csv_file(self):
+        file_path = '/c:/Users/grand/Documents/HouseholdAccount/datas/test.csv'
+        expected_data = {
+            '2024-03': {'Credit Card Debt': -2000, 'UFJ': -5041},
+            '2024-04': {'Credit Card Debt': -1000, 'UFJ': -1000},
+            # Add more expected data here
+        }
+
+        actual_data = process_csv_file(file_path)
+        self.assertEqual(actual_data, expected_data)
+
 if __name__ == '__main__':
     unittest.main()
