@@ -68,6 +68,7 @@ class CSVProcessor:
         日付列から年月を抽出して新しい列を追加する
         Returns:
             dataframe: Dataframe with 'Year' and 'Month' columns added
+            yearmongh column added as string
         """
         df['Date']=pd.to_datetime(df['Date'])
         df['Year']=df['Date'].dt.year
@@ -142,7 +143,7 @@ class CSVProcessor:
 
         return pivot_df
 
-    def calculate_balances(self, processed_df):
+    def calculate_balances(self, pivot_df):
         """
         Calculate balances.
 
@@ -152,27 +153,33 @@ class CSVProcessor:
         Returns:
             dataframe: processed dataframe
         """
-        asset_columns = [col for col in processed_df.columns if str(col).startswith('100')]
-        liability_columns = [col for col in processed_df.columns if str(col).startswith('200')]
-        income_columns = [col for col in processed_df.columns if str(col).startswith('400')]
-        expense_columns = [col for col in processed_df.columns if str(col).startswith('500')]
+        # 月ごとに資産、負債、収入、支出の合計を計算 yearmonthの全要素を取得
+        yearmonths = pivot_df['YearMonth'].values
+        # 空のDataFrameを作成
+        balance_sheet_df = pd.DataFrame(columns=['YearMonth', 'TotalAssets', 'TotalLiabilities', 'TotalIncome', 'TotalExpenses', 'NetIncome', 'TotalEquity'])
 
-        processed_df["TotalLiabilities"]=processed_df[liability_columns].sum(axis=1)
-        processed_df["TotalIncome"]=processed_df[income_columns].sum(axis=1)
-        processed_df["TotalExpenses"]=processed_df[expense_columns].sum(axis=1)
-        processed_df["TotalAssets"]=processed_df[asset_columns].sum(axis=1)
-        processed_df["NetIncome"]= processed_df['TotalIncome']-processed_df['TotalExpenses']
-        processed_df["TotalEquity"]= processed_df['TotalAssets']-processed_df['TotalLiabilities']
+        for yearmonth in yearmonths:
+            # yearmonthのデータを取得
+            item = pivot_df[pivot_df['YearMonth'] == yearmonth]
+            # 資産、負債、収入、支出の合計を計算
+            asset_total = pd.to_numeric(item.filter(regex='^1\d{2}').stack(), errors='coerce').sum()
+            liability_total = pd.to_numeric(item.filter(regex='^2\d{2}').stack(), errors='coerce').sum()
+            income_total = pd.to_numeric(item.filter(regex='^4\d{2}').stack(), errors='coerce').sum()
+            expense_total = pd.to_numeric(item.filter(regex='^5\d{2}').stack(), errors='coerce').sum()
+            net_income = 0 - income_total - expense_total
+            total_equity = 0 - asset_total - liability_total
 
-        for i in range(1,len(self.df)):
-            processed_df.at[i, 'TotalAssets'] += processed_df.at[i-1, 'TotalAssets']
-            processed_df.at[i, 'TotalLiabilities'] += processed_df.at[i-1, 'TotalLiabilities']
-            processed_df.at[i, 'TotalIncome'] += processed_df.at[i-1, 'TotalIncome']
-            processed_df.at[i, 'TotalExpenses'] += processed_df.at[i-1, 'TotalExpenses']
-            processed_df.at[i, 'NetIncome'] += processed_df.at[i-1, 'NetIncome']
-            processed_df.at[i, 'TotalEquity'] += processed_df.at[i-1, 'TotalEquity']
-
-        return processed_df
+            # 合計値を新しい行として追加
+            balance_sheet_df = balance_sheet_df.append({
+                'YearMonth': yearmonth,
+                'TotalAssets': asset_total,
+                'TotalLiabilities': liability_total,
+                'TotalIncome': income_total,
+                'TotalExpenses': expense_total,
+                'NetIncome': net_income,
+                'TotalEquity': total_equity
+            }, ignore_index=True)
+        return balance_sheet_df
 
     def carryover_data(self,df):
         """
@@ -237,9 +244,10 @@ class CSVProcessor:
                     .pipe(self.add_yearmonth_column)
                     .pipe(self.remove_duplicates('ID')))
 
-        carryover_df = self.preprocess_and_pivot(datas)
+        pivot_df = self.preprocess_and_pivot(datas)
+        # balansheet_df = self.calculate_balances(pivot_df)
 
-        combined_df = pd.concat([datas, carryover_df], ignore_index=True)
+        # combined_df = pd.concat([datas, carryover_df], ignore_index=True)
 
         # 処理されたデータを新しいCSVファイルに保存する
         datas.to_csv(self.output_file, index=False)

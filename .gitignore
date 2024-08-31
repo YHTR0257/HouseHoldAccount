@@ -31,3 +31,7 @@ Thumbs.db
 # Ignore temporary files
 /tmp/
 .temp/
+
+# Ignore chache files
+.cache/
+__pycache__/

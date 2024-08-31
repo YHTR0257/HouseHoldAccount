@@ -1,4 +1,4 @@
-from processor.csv_processor import CSVProcessor
+from processor.processor import CSVProcessor
 
 init_data_path = 'datas/test.csv'
 output_modified_path = 'datas/test_modified.csv'
