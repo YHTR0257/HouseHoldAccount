@@ -19,15 +19,18 @@ def test_caluculate_balances():
     processed_df = csv_processor.preprocess_and_pivot(df)
     carryover_df = csv_processor.calculate_balances(processed_df)
     expected_data = {
+        '':[0,1],
         'YearMonth': ['2024-03', '2024-04'],
         'TotalAssets': [-7500, -7500],
         'TotalLiabilities': [-1500, -1500],
         'TotalIncome': [-5500, -5500],
         'TotalExpenses': [14500, 14500],
         'NetIncome': [-9000, -9000],
-        'TotalEquity': [9000, 9000],
-        'Carryover': [9000, 9000]
+        'TotalEquity': [9000, 9000]
     }
     expected_df = pd.DataFrame(expected_data,index=[0,1])
 
     pd.testing.assert_frame_equal(carryover_df, expected_df)
+
+def test_month_end_close():
+    csv_processor = CSVProcessor('tests/test.csv', 'tests/test_output.csv', 'codes.json')

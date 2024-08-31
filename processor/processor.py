@@ -181,7 +181,7 @@ class CSVProcessor:
             }, ignore_index=True)
         return balance_sheet_df
 
-    def carryover_data(self,df):
+    def carryover_data(self,balance_sheet_df):
         """
         Process and generate carryover data from the CSV file.
         Which is balance sheet data.
@@ -190,7 +190,7 @@ class CSVProcessor:
             dataframe: carryover dataframe
         """
         # データのコピー (元のデータを変更しないようにする)
-        df = df.copy()
+        df = balance_sheet_df.copy()
 
         # 資産（1で始まるカラム）と負債（2で始まるカラム）をフィルタリング
         asset_columns = [col for col in df.columns if str(col).startswith('1')]
@@ -230,6 +230,26 @@ class CSVProcessor:
         carryover_df = self.generate_id(carryover_df)
         return carryover_df
 
+    def month_end_close(self, carryover_df, closing_file_path):
+        """
+        月末処理を行う
+        """
+        df = pd.read_csv(self.output_file)
+        self.generate_id(carryover_df)
+        # dfにcarryover_dfを追加
+        df = pd.concat([df, carryover_df])
+        print(df)
+
+        # IDでソート
+        df = df.sort_values('ID')
+        # IDを文字列に変換
+        df['ID'] = df['ID'].astype(str)
+        # 重複データを削除
+        df = df.drop_duplicates(subset='ID', keep='first')
+        # CSVファイルに保存
+        df.to_csv(closing_file_path, index=False)
+        print("Month-end closing completed.")
+
     def process_csv(self):
         """
         CSVファイルの処理を行う
@@ -251,24 +271,4 @@ class CSVProcessor:
 
         # 処理されたデータを新しいCSVファイルに保存する
         datas.to_csv(self.output_file, index=False)
-        print("CSV processing completed.")
-
-    def month_end_close(self, carryover_df, closing_file_path):
-        """
-        月末処理を行う
-        """
-        df = pd.read_csv(self.output_file)
-        self.generate_id(carryover_df)
-        # dfにcarryover_dfを追加
-        df = pd.concat([df, carryover_df])
-        print(df)
-
-        # IDでソート
-        df = df.sort_values('ID')
-        # IDを文字列に変換
-        df['ID'] = df['ID'].astype(str)
-        # 重複データを削除
-        df = df.drop_duplicates(subset='ID', keep='first')
-        # CSVファイルに保存
-        df.to_csv(closing_file_path, index=False)
-        print("Month-end closing completed.")
+        return print("CSV processing completed.")
