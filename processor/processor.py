@@ -162,15 +162,15 @@ class CSVProcessor:
             # yearmonthのデータを取得
             item = pivot_df[pivot_df['YearMonth'] == yearmonth]
             # 資産、負債、収入、支出の合計を計算
-            asset_total = pd.to_numeric(item.filter(regex='^1\d{2}').stack(), errors='coerce').sum()
-            liability_total = pd.to_numeric(item.filter(regex='^2\d{2}').stack(), errors='coerce').sum()
-            income_total = pd.to_numeric(item.filter(regex='^4\d{2}').stack(), errors='coerce').sum()
-            expense_total = pd.to_numeric(item.filter(regex='^5\d{2}').stack(), errors='coerce').sum()
+            asset_total = pd.to_numeric(item.filter(regex='^1\d{2}').stack(), errors='coerce').fillna(0).sum()
+            liability_total = pd.to_numeric(item.filter(regex='^2\d{2}').stack(), errors='coerce').fillna(0).sum()
+            income_total = pd.to_numeric(item.filter(regex='^4\d{2}').stack(), errors='coerce').fillna(0).sum()
+            expense_total = pd.to_numeric(item.filter(regex='^5\d{2}').stack(), errors='coerce').fillna(0).sum()
             net_income = 0 - income_total - expense_total
             total_equity = 0 - asset_total - liability_total
 
             # 合計値を新しい行として追加
-            balance_sheet_df = balance_sheet_df.append({
+            balance_sheet_df.append({
                 'YearMonth': yearmonth,
                 'TotalAssets': asset_total,
                 'TotalLiabilities': liability_total,
@@ -178,7 +178,16 @@ class CSVProcessor:
                 'TotalExpenses': expense_total,
                 'NetIncome': net_income,
                 'TotalEquity': total_equity
-            }, ignore_index=True)
+            })
+        balance_sheet_df = balance_sheet_df.astype({
+            'YearMonth': 'str',
+            'TotalAssets': 'int64',
+            'TotalLiabilities': 'int64',
+            'TotalIncome': 'int64',
+            'TotalExpenses': 'int64',
+            'NetIncome': 'int64',
+            'TotalEquity': 'int64'
+        })
         return balance_sheet_df
 
     def carryover_data(self,balance_sheet_df):
