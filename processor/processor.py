@@ -230,14 +230,13 @@ class CSVProcessor:
         carryover_df = self.generate_id(carryover_df)
         return carryover_df
 
-    def month_end_close(self, carryover_df, closing_file_path):
+    def month_end_close(self, preprocessed_df, carryover_df):
         """
         月末処理を行う
         """
-        df = pd.read_csv(self.output_file)
         self.generate_id(carryover_df)
         # dfにcarryover_dfを追加
-        df = pd.concat([df, carryover_df])
+        df = pd.concat([preprocessed_df, carryover_df])
         print(df)
 
         # IDでソート
@@ -246,8 +245,6 @@ class CSVProcessor:
         df['ID'] = df['ID'].astype(str)
         # 重複データを削除
         df = df.drop_duplicates(subset='ID', keep='first')
-        # CSVファイルに保存
-        df.to_csv(closing_file_path, index=False)
         print("Month-end closing completed.")
 
     def process_csv(self):
@@ -265,7 +262,9 @@ class CSVProcessor:
                     .pipe(self.remove_duplicates('ID')))
 
         pivot_df = self.preprocess_and_pivot(datas)
-        # balansheet_df = self.calculate_balances(pivot_df)
+        balansheet_df = self.calculate_balances(pivot_df)
+
+        datas = self.month_end_close(datas, balansheet_df)
 
         # combined_df = pd.concat([datas, carryover_df], ignore_index=True)
 
