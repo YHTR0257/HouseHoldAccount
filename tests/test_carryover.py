@@ -28,17 +28,24 @@ def test_get_subject_sum():
 
 def test_caluculate_balances():
     csv_processor = CSVProcessor('tests/test.csv', None, subjectcodes_path='codes.json',balance_sheet_path=None)
-    df = pd.read_csv('tests/test.csv')
-    pivot_df = csv_processor.preprocess_and_pivot(df)
-    balances_df = csv_processor.calculate_balances(pivot_df)
+    sample_data = {
+        'YearMonth': ['2024-01', '2024-02'],
+        '100': [-400, -400],
+        '101': [500, 600],
+        '200': [-300, -400],
+        '400': [-500, -600],
+        '500': [700, 800]
+    }
+    df = pd.DataFrame(sample_data)
+    balances_df = csv_processor.calculate_balances(df)
     expected_balancesheet = {
-        'YearMonth': ['2024-03', '2024-04'],
-        'TotalAssets': [-7500, -7500],
-        'TotalLiabilities': [-1500, -1500],
-        'TotalIncome': [-5500, -5500],
-        'TotalExpenses': [14500, 14500],
-        'NetIncome': [-9000, -9000],
-        'TotalEquity': [9000, 9000]
+        'YearMonth': ['2024-01', '2024-02'],
+        'TotalAssets': [100, 200],
+        'TotalLiabilities': [-300, -400],
+        'TotalIncome': [-500, -600],
+        'TotalExpenses': [700, 800],
+        'NetIncome': [-200, -200],
+        'TotalEquity': [200, 200]
     }
     expected_balance_df = pd.DataFrame(expected_balancesheet, columns=['YearMonth', 'TotalAssets', 'TotalLiabilities', 'TotalIncome', 'TotalExpenses', 'NetIncome', 'TotalEquity'])
 

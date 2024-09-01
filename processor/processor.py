@@ -174,11 +174,11 @@ class CSVProcessor:
                     'Amount': value
                 }
                 rows.append(row)
-        rows = pd.DataFrame(rows)
-        rows = rows.sort_values(by=['YearMonth', 'SubjectCode'])
-        return rows
+        sums = pd.DataFrame(rows)
+        sums = sums.sort_values(by=['YearMonth', 'SubjectCode'])
+        return sums
 
-    def calculate_balances(self, pivot_df):
+    def calculate_balances(self, subject_sums):
         """
         Calculate balances.
 
@@ -188,33 +188,26 @@ class CSVProcessor:
         Returns:
             dataframe: processed dataframe
         """
-        # 月ごとに資産、負債、収入、支出の合計を計算 yearmonthの全要素を取得
-        yearmonths = pivot_df['YearMonth'].values
+        yearmonths = subject_sums['YearMonth'].values
         yearmonths = np.unique(yearmonths)
-        # 空のDataFrameを作成
         rows = []
 
         for yearmonth in yearmonths:
-            # yearmonthのデータを取得
-            item = pivot_df[pivot_df['YearMonth'] == yearmonth]
-            # 資産、負債、収入、支出の合計を計算
-            asset_total =  pd.to_numeric(item.filter(regex='^1\d{2}').stack(), errors='coerce').fillna(0).sum()
+            item = subject_sums[subject_sums['YearMonth'] == yearmonth]
+            asset_total = pd.to_numeric(item.filter(regex='^1\d{2}').stack(), errors='coerce').fillna(0).sum()
             liability_total = pd.to_numeric(item.filter(regex='^2\d{2}').stack(), errors='coerce').fillna(0).sum()
             income_total = pd.to_numeric(item.filter(regex='^4\d{2}').stack(), errors='coerce').fillna(0).sum()
             expense_total = pd.to_numeric(item.filter(regex='^5\d{2}').stack(), errors='coerce').fillna(0).sum()
             net_income = 0 - income_total - expense_total
             total_equity = 0 - asset_total - liability_total
-            print(f"YearMonth: {yearmonth}, TotalAssets: {asset_total}, TotalLiabilities: {liability_total}, TotalIncome: {income_total}, TotalExpenses: {expense_total}, NetIncome: {net_income}, TotalEquity: {total_equity}")
-
-            # 合計値を新しい行として追加
             row = {
-            'YearMonth': yearmonth,
-            'TotalAssets': asset_total,
-            'TotalLiabilities': liability_total,
-            'TotalIncome': income_total,
-            'TotalExpenses': expense_total,
-            'NetIncome': net_income,
-            'TotalEquity': total_equity
+                'YearMonth': yearmonth,
+                'TotalAssets': asset_total,
+                'TotalLiabilities': liability_total,
+                'TotalIncome': income_total,
+                'TotalExpenses': expense_total,
+                'NetIncome': net_income,
+                'TotalEquity': total_equity
             }
             rows.append(row)
 
@@ -230,26 +223,6 @@ class CSVProcessor:
             'TotalEquity': 'int64'
         })
         return balance_sheet_df
-
-    def get_last_day_of_month(self,formatted_day):
-        """
-        Get the last day of the month from a formatted date string.
-        Args:
-            formatted_day (str): Date string in the format 'YYYY-MM-DD'
-        Returns:
-            datetime: Last day of the month
-        """
-        # Parse the formatted_day string to a datetime object
-        date_obj = dt.datetime.strptime(formatted_day, '%Y-%m-%d')
-
-        # Get the last day of the month
-        last_day = calendar.monthrange(date_obj.year, date_obj.month)[1]
-
-        # Construct a new datetime object representing the last day of the month
-        last_day_date = dt.datetime(date_obj.year, date_obj.month, last_day)
-        last_day_date = last_day_date.strftime('%Y-%m-%d')
-
-        return last_day_date
 
     def get_date_for_carryover(self,formatted_day):
         '''
@@ -291,6 +264,7 @@ class CSVProcessor:
         yearmonths = np.unique(yearmonths)
         rows = []
 
+        subject_sums = self.get_subject_sum(df)
         balance_sheet_df = self.calculate_balances(pivot_df)
 
         # 次月繰越用のデータを生成
