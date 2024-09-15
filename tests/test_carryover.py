@@ -17,7 +17,7 @@ def test_get_subject_sum():
     }
     expected_df = pd.DataFrame(expected_data)
 
-    csv_processor = CSVProcessor('tests/test.csv', None, subjectcodes_path='codes.json',balance_sheet_path=None)
+    csv_processor = CSVProcessor('tests/test.csv', None, subjectcodes_path='codes.csv',balance_sheet_path=None)
     result_df = csv_processor.get_subject_sum(df)
 
     result_df = result_df.reset_index(drop=True)
@@ -27,7 +27,7 @@ def test_get_subject_sum():
     pd.testing.assert_frame_equal(result_df, expected_df)
 
 def test_caluculate_balances():
-    csv_processor = CSVProcessor('tests/test.csv', None, subjectcodes_path='codes.json',balance_sheet_path=None)
+    csv_processor = CSVProcessor('tests/test.csv', None, subjectcodes_path='codes.csv',balance_sheet_path=None)
     sample_data = {
         'YearMonth': ['2024-01', '2024-02'],
         '100': [-400, -400],
@@ -51,10 +51,10 @@ def test_caluculate_balances():
 
     pd.testing.assert_frame_equal(balances_df, expected_balance_df)
 
-# def test_month_close_and_carryover():
-#     csv_processor = CSVProcessor(None,None, subjectcodes_path='codes.json',balance_sheet_path=None)
-#     test_df = pd.read_csv('tests/carryover.csv')
-#     expected_data = pd.read_csv('tests/carryover_expected.csv')
-#     test_pivot_df = csv_processor.preprocess_and_pivot(test_df)
-#     actual_data = csv_processor.month_close_and_carryover(test_df, test_pivot_df)
-#     pd.testing.assert_frame_equal(actual_data, expected_data)
+def test_month_close_and_carryover():
+    csv_processor = CSVProcessor(None,None, subjectcodes_path='codes.csv',balance_sheet_path=None)
+    test_df = pd.read_csv('tests/carryover.csv')
+    expected_data = pd.read_csv('tests/carryover_expected.csv')
+    test_pivot_df = csv_processor.preprocess_and_pivot(test_df)
+    actual_data = csv_processor.month_close_and_carryover(test_df, test_pivot_df)
+    pd.testing.assert_frame_equal(actual_data, expected_data)

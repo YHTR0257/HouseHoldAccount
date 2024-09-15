@@ -84,38 +84,39 @@ class CSVProcessor:
         Returns:
             dataframe: Dataframe with 'Subject' columns added as string
         """
-        df['Subject'] = df.apply(lambda data: self.find_by_id(self.code_file, data['SubjectCode'], axis=1))
+        print(df.columns)
+        df['Subject'] = df.apply(lambda data: self.find_by_id(data['SubjectCode']),axis=1)
         return df
 
     def find_by_id(self, search_id):
         """
         JSONファイルから指定されたIDの要素を検索する
         Args:
-            search_id (int): 検索するID
+            search_id (str): 検索するID
         Returns:
             str: 見つかった要素のキー
         """
+        # IDが正しいかどうかを確認
+        if not search_id.isdigit():
+            print(f"Error: ID '{search_id}' is not a valid ID.")
+            return None
         search_id=str(search_id)
         try:
             # JSONファイルを読み込む
             with open(self.code_file, 'r', encoding='utf-8') as f:
-                data = json.load(f)
+                #dtype: id: str, subject: str
+                data = pd.read_csv(f, dtype={'id':str,'subject':str})
         except FileNotFoundError:
             print(f"Error: File '{self.code_file}' not found.")
             return None
-        except json.JSONDecodeError:
-            print(f"Error: File '{self.code_file}' is not a valid JSON.")
+
+        # 指定されたidを持つ要素を検索
+        try:
+            subject = data[data['id'] == search_id]['subject'].values[0]
+            return subject
+        except IndexError:
+            print(f"Error: ID '{search_id}' not found in the codes file.")
             return None
-
-        # 指定されたidを持つ要素を検索する
-        for key, value in data.items():
-            # valueが辞書であり、'id'キーが存在するかどうかを確認
-            if isinstance(value, dict) and 'id' in value:
-                if value['id'] == search_id:
-                    return key
-
-        print(f"Error: ID '{search_id}' not found in JSON.")
-        return None
 
     def remove_duplicates(self, df):
         # ID, Date, Amount, Remarksが全て同じ行を削除
@@ -260,51 +261,38 @@ class CSVProcessor:
             dataframe: carryover dataframe
         """
         df = processed_df
+        df = df.astype({
+            'Date': 'str',
+            'SubjectCode': 'str',
+            'Amount': 'int64',
+            'Remarks': 'str',
+            'YearMonth': 'str'
+        })
         yearmonths = df['YearMonth'].values
         yearmonths = np.unique(yearmonths)
         rows = []
 
         subject_sums = self.get_subject_sum(df)
+        carryover_sums = df[df['SubjectCode'].str.startswith(('1', '2'))] # asset and liability
         balance_sheet_df = self.calculate_balances(pivot_df)
 
-        # 次月繰越用のデータを生成
+        # Process the carryover data for each yearmonth
         for yearmonth in yearmonths:
-            # 繰越データの日付を設定
-            formatted_day = yearmonth + "-01"
-            closing_date, opening_date = self.get_date_for_carryover(formatted_day)
-            datas = df[df['YearMonth'] == yearmonth]
-            equity = balance_sheet_df[balance_sheet_df['YearMonth'] == yearmonth]['TotalEquity'].values[0]
-            net_income = balance_sheet_df[balance_sheet_df['YearMonth'] == yearmonth]['NetIncome'].values[0]
-            rows.append({
-                'Date': str(closing_date),
-                'SubjectCode': 300,
-                'Amount': int(equity),
-                'Remarks': 'Carryover 99'
-            })
-            rows.append({
-                'Date': str(closing_date),
-                'SubjectCode': 600,
-                'Amount': int(net_income),
-                'Remarks': 'Carryover 99'
-            })
-
-            # 資産と負債の合計を計算し、繰越データを生成
-            # SubjectCodeによって処理を分ける
-            subjects = datas['SubjectCode'].unique()
-
-            for subject in subjects:
-                value = pd.to_numeric(datas[datas['SubjectCode'] == subject]['Amount'].values, errors='coerce').fillna(0).sum()
-                rows.append({
-                    'Date': str(closing_date),
-                    'SubjectCode': subject,
-                    'Amount': int(value),
+            last_day_date, next_first_day_date = self.get_date_for_carryover(yearmonth + '-01')
+            for item in [['NetIncome','300'],['TotalEquity','600']]:
+                row = {
+                    'Date': last_day_date,
+                    'SubjectCode': item[1],
+                    'Amount': balance_sheet_df[balance_sheet_df['YearMonth'] == yearmonth][item[0]].values[0],
                     'Remarks': 'Carryover 99'
-                })
+                }
+                rows.append(row)
+
         carryovers = pd.DataFrame(rows)
         print(carryovers)
         carryovers = carryovers.astype({
             'Date': 'str',
-            'SubjectCode': 'int64',
+            'SubjectCode': 'str',
             'Amount': 'int64',
             'Remarks': 'str'
         })
@@ -324,6 +312,12 @@ class CSVProcessor:
         すべてのメソッドはここで実行される
         """
         datas = pd.read_csv(self.input_file)
+        datas = datas.astype({
+            'Date': 'str',
+            'SubjectCode': 'str',
+            'Amount': 'int64',
+            'Remarks': 'str'
+        })
 
         # 入力したデータを読み込んで処理を行う
         datas = (datas.pipe(self.generate_id)
