@@ -69,13 +69,13 @@ class CSVProcessor:
         """
         日付列から年月を抽出して新しい列を追加する
         Returns:
-            dataframe: Dataframe with 'Year' and 'Month' columns added
+            dataframe: Dataframe with 'Year' and 'Month','YearMonth' columns added
             yearmongh column added as string
         """
         df['Date']=pd.to_datetime(df['Date'])
         df['Year']=df['Date'].dt.year
         df['Month']=df['Date'].dt.month
-        df['YearMonth'] = df['Date'].str[:7]
+        df['YearMonth'] = df['Date'].apply(lambda x: x.strftime('%Y-%m'))
         return df
 
     def apply_subject_from_code(self,df):
@@ -151,7 +151,7 @@ class CSVProcessor:
 
         return pivot_df
 
-    def get_subject_sum(self,df):
+    def get_subject_sum(df):
         """
         Get the sum of the each subject code.
         Args:
@@ -163,22 +163,57 @@ class CSVProcessor:
         """
         yearmonths = df['YearMonth'].values
         yearmonths = np.unique(yearmonths)
-        rows = []
+        each_subject_rows = []
+        each_category_rows = []
         for yearmonth in yearmonths:
-            item = df[df['YearMonth'] == yearmonth]
-            subjects = item['SubjectCode'].unique()
-            for subject in subjects:
-                value = pd.to_numeric(item[item['SubjectCode'] == subject]['Amount'], errors='coerce').sum()
-                row = {
+            items_each_yearmonth = df[df['YearMonth'] == yearmonth]
+            items_each_yearmonth = items_each_yearmonth.astype({'Amount': int, 'SubjectCode': str})
+
+            for subject in items_each_yearmonth['SubjectCode'].unique():
+                subject_sum = pd.to_numeric(items_each_yearmonth[items_each_yearmonth['SubjectCode'] == subject]['Amount'], errors='coerce').sum()
+                each_subject_row = {
                     'YearMonth': yearmonth,
                     'SubjectCode': subject,
-                    'Amount': value
+                    'Amount': subject_sum
                 }
-                rows.append(row)
-        sums = pd.DataFrame(rows)
-        sums = sums.sort_values(by=['YearMonth', 'SubjectCode'])
-        return sums
+                each_subject_rows.append(each_subject_row)
+            for category in ['1','2','4','5']:
+                category_items = []
+                for item in items_each_yearmonth['SubjectCode']:
+                    if item.startswith(category):
+                        category_row = {
+                            'YearMonth': yearmonth,
+                            'SubjectCode': item,
+                            'Amount': items_each_yearmonth[items_each_yearmonth['SubjectCode'] == item]['Amount'].values[0]
+                        }
+                        category_items.append(category_row)
+                category_items = pd.DataFrame(category_items)
+                category_sum = pd.to_numeric(category_items['Amount'], errors='coerce').sum()
+                each_category_row = {
+                    'YearMonth': yearmonth,
+                    'SubjectCode': category[0] + '00',
+                    'Amount': category_sum
+                }
+                each_category_rows.append(each_category_row)
+            print(each_category_rows)
+        sums_each_subject = pd.DataFrame(each_subject_rows)
+        sums_each_subject = sums_each_subject.sort_values(by=['YearMonth', 'SubjectCode'])
+        sums_each_category = pd.DataFrame(each_category_rows)
+        sums_each_category = sums_each_category.pivot_table(index='YearMonth',columns='SubjectCode',values='Amount')
+        sums_each_category.index.name = 'YearMonth'
+        sums_each_category = sums_each_category.reset_index()
+        #Caluculate net income and total equity
+        sums_each_category['NetIncome'] = 0 - sums_each_category['400'] + sums_each_category['500']
+        sums_each_category['TotalEquity'] = 0 - sums_each_category['100'] + sums_each_category['200']
+        sums_each_category = sums_each_category.rename(columns={
+            '100':'TotalAssets',
+            '200':'TotalLiabilities',
+            '400':'TotalIncome',
+            '500':'TotalExpenses'
+            })
+        return sums_each_subject, sums_each_category
 
+# ここを変更して、categoryから純資産と損益を計算するようにする。テストも追加する。大幅に変更が加わる可能性大
     def calculate_balances(self, subject_sums):
         """
         Calculate balances.
@@ -272,7 +307,8 @@ class CSVProcessor:
         yearmonths = np.unique(yearmonths)
         rows = []
 
-        subject_sums = self.get_subject_sum(df)
+        sums_each_subject = self.get_subject_sum(df)
+        asset_ = sums_each_subject[sums_each_subject['SubjectCode'].str.startswith('1')]
         carryover_sums = df[df['SubjectCode'].str.startswith(('1', '2'))] # asset and liability
         balance_sheet_df = self.calculate_balances(pivot_df)
 
