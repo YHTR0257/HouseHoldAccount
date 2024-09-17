@@ -203,8 +203,8 @@ class CSVProcessor:
         sums_each_category.index.name = 'YearMonth'
         sums_each_category = sums_each_category.reset_index()
         #Caluculate net income and total equity
-        sums_each_category['NetIncome'] = 0 - sums_each_category['400'] + sums_each_category['500']
-        sums_each_category['TotalEquity'] = 0 - sums_each_category['100'] + sums_each_category['200']
+        sums_each_category['TotalEquity'] = 0 - sums_each_category['100'] - sums_each_category['200']
+        sums_each_category['NetIncome'] = 0 - sums_each_category['400'] - sums_each_category['500']
         sums_each_category = sums_each_category.rename(columns={
             '100':'TotalAssets',
             '200':'TotalLiabilities',
@@ -212,53 +212,6 @@ class CSVProcessor:
             '500':'TotalExpenses'
             })
         return sums_each_subject, sums_each_category
-
-# ここを変更して、categoryから純資産と損益を計算するようにする。テストも追加する。大幅に変更が加わる可能性大
-    def calculate_balances(self, subject_sums):
-        """
-        Calculate balances.
-
-        Args:
-            dataframe: pivoted dataframe index is YearMonth, columns are SubjectCode, values are Amount
-
-        Returns:
-            dataframe: processed dataframe
-        """
-        yearmonths = subject_sums['YearMonth'].values
-        yearmonths = np.unique(yearmonths)
-        rows = []
-
-        for yearmonth in yearmonths:
-            item = subject_sums[subject_sums['YearMonth'] == yearmonth]
-            asset_total = pd.to_numeric(item.filter(regex='^1\d{2}').stack(), errors='coerce').fillna(0).sum()
-            liability_total = pd.to_numeric(item.filter(regex='^2\d{2}').stack(), errors='coerce').fillna(0).sum()
-            income_total = pd.to_numeric(item.filter(regex='^4\d{2}').stack(), errors='coerce').fillna(0).sum()
-            expense_total = pd.to_numeric(item.filter(regex='^5\d{2}').stack(), errors='coerce').fillna(0).sum()
-            net_income = 0 - income_total - expense_total
-            total_equity = 0 - asset_total - liability_total
-            row = {
-                'YearMonth': yearmonth,
-                'TotalAssets': asset_total,
-                'TotalLiabilities': liability_total,
-                'TotalIncome': income_total,
-                'TotalExpenses': expense_total,
-                'NetIncome': net_income,
-                'TotalEquity': total_equity
-            }
-            rows.append(row)
-
-        # Create DataFrame from the list of rows
-        balance_sheet_df = pd.DataFrame(rows)
-        balance_sheet_df = balance_sheet_df.astype({
-            'YearMonth': 'str',
-            'TotalAssets': 'int64',
-            'TotalLiabilities': 'int64',
-            'TotalIncome': 'int64',
-            'TotalExpenses': 'int64',
-            'NetIncome': 'int64',
-            'TotalEquity': 'int64'
-        })
-        return balance_sheet_df
 
     def get_date_for_carryover(self,formatted_day):
         '''
