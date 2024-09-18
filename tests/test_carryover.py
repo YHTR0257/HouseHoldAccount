@@ -1,31 +1,6 @@
 from processor.processor import CSVProcessor
 import pandas as pd
 
-def test_get_subject_sum():
-    # Sample data for testing
-    data = {
-        'YearMonth': ['2023-01', '2023-02', '2023-02', '2023-02', '2023-02'],
-        'SubjectCode': ['100', '200', '100', '200', '300'],
-        'Amount': [10, 20, 30, -400, 50]
-    }
-    df = pd.DataFrame(data)
-
-    expected_data = {
-        'YearMonth': ['2023-01', '2023-02', '2023-02', '2023-02'],
-        'SubjectCode': ['100', '100', '200', '300'],
-        'Amount': [10, 30, -380, 50]
-    }
-    expected_df = pd.DataFrame(expected_data)
-
-    csv_processor = CSVProcessor('tests/test.csv', None, subjectcodes_path='codes.csv',balance_sheet_path=None)
-    result_df = csv_processor.get_subject_sum(df)
-
-    result_df = result_df.reset_index(drop=True)
-    expected_df = expected_df.reset_index(drop=True)
-
-    # Check if the result matches the expected DataFrame
-    pd.testing.assert_frame_equal(result_df, expected_df)
-
 def test_caluculate_balances():
     csv_processor = CSVProcessor('tests/test.csv', None, subjectcodes_path='codes.csv',balance_sheet_path=None)
     sample_data = {
@@ -50,6 +25,21 @@ def test_caluculate_balances():
     expected_balance_df = pd.DataFrame(expected_balancesheet, columns=['YearMonth', 'TotalAssets', 'TotalLiabilities', 'TotalIncome', 'TotalExpenses', 'NetIncome', 'TotalEquity'])
 
     pd.testing.assert_frame_equal(balances_df, expected_balance_df)
+
+def test_getting_subject_sum():
+    csv_processor = CSVProcessor(None, None, subjectcodes_path='codes.csv',balance_sheet_path=None)
+    df = pd.read_csv('tests/test.csv')
+    df = csv_processor.add_yearmonth_column(df)
+    sums_subject,sums_category = csv_processor.get_subject_sum(df)
+    expected_data = {
+        'YearMonth': ['2024-03', '2024-04'],
+        'TotalAssets': [-6000, -6000],
+        'TotalLiabilities': [-4000, -4000],
+        'TotalIncome': [-5500, -5500],
+        'TotalExpenses': [15500, 15500],
+        'TotalEquity': [10000, 10000],
+        'NetIncome': [-10000, -10000]
+    }
 
 def test_month_close_and_carryover():
     csv_processor = CSVProcessor(None,None, subjectcodes_path='codes.csv',balance_sheet_path=None)

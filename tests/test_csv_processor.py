@@ -51,10 +51,10 @@ def test_get_subject_name():
     csv_processor = CSVProcessor(None, None, subjectcodes_path='codes.csv',balance_sheet_path=None)
     test_data = {
         'Date' : ['2024-03-03', '2024-03-03'],
-        'ID' : ['20240303001', '20240303002'],
+        'ID' : ['202403030010', '202403030020'],
         'SubjectCode' : ['200', '101'],
         'Amount' : ['-2000', '-2145'],
-        'Remarks' : ['Starbucks 01', 'Tempura 02'],
+        'Remarks' : ['Starbucks 001', 'Tempura 002'],
         'Year' : ['2024', '2024'],
         'Month' : ['3', '3']
     }
@@ -62,10 +62,10 @@ def test_get_subject_name():
     actual_df = csv_processor.apply_subject_from_code(test_df)
     expected_data = {
         'Date' : ['2024-03-03', '2024-03-03'],
-        'ID' : ['20240303001', '20240303002'],
+        'ID' : ['202403030010', '202403030020'],
         'SubjectCode' : ['200', '101'],
         'Amount' : ['-2000', '-2145'],
-        'Remarks' : ['Starbucks 01', 'Tempura 02'],
+        'Remarks' : ['Starbucks 001', 'Tempura 002'],
         'Year' : ['2024', '2024'],
         'Month' : ['3', '3'],
         'Subject' : ['Credit Card Debt', 'UFJ']

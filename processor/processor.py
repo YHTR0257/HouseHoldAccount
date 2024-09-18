@@ -39,8 +39,8 @@ class CSVProcessor:
                 amount = row['Amount']
                 sign = "1" if float(amount) >= 0 else "0"
                 remark = row['Remarks']
-                remark_suffix = remark[-2:] if len(remark) >= 2 else remark
-                # IDを生成し、Remarkの後ろ2文字を連結
+                remark_suffix = remark[-3:] if len(remark) >= 3 else remark
+                # IDを生成し、Remarkの後ろ3文字を連結
                 generated_id = f"{date_part}{remark_suffix}{sign}"
                 return int(generated_id)
             else:
@@ -122,13 +122,13 @@ class CSVProcessor:
         # ID, Date, Amount, Remarksが全て同じ行を削除
         return df.drop_duplicates(subset=['ID', 'Date', 'Amount', 'Remarks'], keep='first')
 
-    def preprocess_and_pivot(self,df):
+    def get_monthly_summery(df):
         """
-        Preprocess the data read from the CSV file, and pivot and format the DataFrame for making balance sheet.
+        Calculate the sum of each subject code for each month. YearMonth is the index, SubjectCode is the column, and Amount is the value.
 
         Args:
             Dataframe: Dataframe containing 'Date', 'SubjectCode', 'Amount'
-                Date (str): Date in the format 'YYYY-MM-DD'.
+                YearMonth (str): Year and month in 'YYYY-MM' format.
                 SubjectCode (str): Subject code.
                 Amount (int): Account amount.
 
@@ -136,47 +136,21 @@ class CSVProcessor:
             Dataframe: processed dataframe index is YearMonth, columns are SubjectCode, values are Amount
         """
         # データの読み込み
-        columns_to_read=['Date','SubjectCode','Amount']
+        columns_to_read=['YearMonth','SubjectCode','Amount']
         df = df[columns_to_read]
 
-        # データの前処理
-        df['YearMonth'] = df['Date'].str[:7]
-        df = df[['YearMonth','SubjectCode','Amount']]
-
         # ピボットとフォーマット 月ごとの科目別合計金額を計算
-        # pivot_dfは、月ごとの科目別合計金額を持つDataFrame 行は月、列は科目コード
-        pivot_df = df.pivot_table(index='YearMonth', columns='SubjectCode', values='Amount', aggfunc='sum').reset_index()
-        pivot_df = pivot_df.fillna(0)
-        pivot_df = pivot_df.astype({col: int for col in pivot_df.columns if col != 'YearMonth'})
+        # sum_of_subjectは、月ごとの科目別合計金額を持つDataFrame 行は月、列は科目コード
+        sum_of_subjects = df.pivot_table(index='YearMonth', columns='SubjectCode', values='Amount', aggfunc='sum').reset_index()
+        sum_of_subjects = sum_of_subjects.fillna(0)
+        sum_of_subjects = sum_of_subjects.astype({col: int for col in sum_of_subjects.columns if col != 'YearMonth'})
 
-        return pivot_df
-
-    def get_subject_sum(df):
-        """
-        Get the sum of the each subject code.
-        Args:
-            dataframe: Dataframe containing 'SubjectCode', 'Amount'
-                SubjectCode (str): Subject code.
-                Amount (int): Account amount.
-        Returns:
-            dataframe: Dataframe containing 'SubjectCode', 'Amount', 'YearMonth'
-        """
         yearmonths = df['YearMonth'].values
         yearmonths = np.unique(yearmonths)
-        each_subject_rows = []
         each_category_rows = []
         for yearmonth in yearmonths:
             items_each_yearmonth = df[df['YearMonth'] == yearmonth]
             items_each_yearmonth = items_each_yearmonth.astype({'Amount': int, 'SubjectCode': str})
-
-            for subject in items_each_yearmonth['SubjectCode'].unique():
-                subject_sum = pd.to_numeric(items_each_yearmonth[items_each_yearmonth['SubjectCode'] == subject]['Amount'], errors='coerce').sum()
-                each_subject_row = {
-                    'YearMonth': yearmonth,
-                    'SubjectCode': subject,
-                    'Amount': subject_sum
-                }
-                each_subject_rows.append(each_subject_row)
             for category in ['1','2','4','5']:
                 category_items = []
                 for item in items_each_yearmonth['SubjectCode']:
@@ -196,22 +170,20 @@ class CSVProcessor:
                 }
                 each_category_rows.append(each_category_row)
             print(each_category_rows)
-        sums_each_subject = pd.DataFrame(each_subject_rows)
-        sums_each_subject = sums_each_subject.sort_values(by=['YearMonth', 'SubjectCode'])
         sums_each_category = pd.DataFrame(each_category_rows)
         sums_each_category = sums_each_category.pivot_table(index='YearMonth',columns='SubjectCode',values='Amount')
         sums_each_category.index.name = 'YearMonth'
         sums_each_category = sums_each_category.reset_index()
         #Caluculate net income and total equity
-        sums_each_category['TotalEquity'] = 0 - sums_each_category['100'] - sums_each_category['200']
         sums_each_category['NetIncome'] = 0 - sums_each_category['400'] - sums_each_category['500']
+        sums_each_category['TotalEquity'] = 0 - sums_each_category['100'] - sums_each_category['200']
         sums_each_category = sums_each_category.rename(columns={
             '100':'TotalAssets',
             '200':'TotalLiabilities',
             '400':'TotalIncome',
             '500':'TotalExpenses'
             })
-        return sums_each_subject, sums_each_category
+        return sum_of_subjects, sums_each_category
 
     def get_date_for_carryover(self,formatted_day):
         '''
@@ -237,63 +209,40 @@ class CSVProcessor:
 
         return last_day_date, next_first_day_date
 
-    def month_close_and_carryover(self,processed_df, pivot_df):
-        """
-        Process and generate carryover data from the CSV file.
-        Which is balance sheet data.
+    def get_carryover_data(self,sum_of_subjects, sum_of_categories):
+        sum_of_subjects = sum_of_subjects[sum_of_subjects['YearMonth'] == self.yearmonth]
+        sum_of_categories = sum_of_categories[sum_of_categories['YearMonth'] == self.yearmonth]
+        print(sum_of_subjects)
+        closing_day,next_first_day_date = self.get_date_for_carryover(self.yearmonth+'-01')
+        carryover_data = []
 
-        Args:
-            dataframe: processed dataframe, which is the output of preprocess_and_pivot
-
-        Returns:
-            dataframe: carryover dataframe
-        """
-        df = processed_df
-        df = df.astype({
-            'Date': 'str',
-            'SubjectCode': 'str',
-            'Amount': 'int64',
-            'Remarks': 'str',
-            'YearMonth': 'str'
-        })
-        yearmonths = df['YearMonth'].values
-        yearmonths = np.unique(yearmonths)
-        rows = []
-
-        sums_each_subject = self.get_subject_sum(df)
-        asset_ = sums_each_subject[sums_each_subject['SubjectCode'].str.startswith('1')]
-        carryover_sums = df[df['SubjectCode'].str.startswith(('1', '2'))] # asset and liability
-        balance_sheet_df = self.calculate_balances(pivot_df)
-
-        # Process the carryover data for each yearmonth
-        for yearmonth in yearmonths:
-            last_day_date, next_first_day_date = self.get_date_for_carryover(yearmonth + '-01')
-            for item in [['NetIncome','300'],['TotalEquity','600']]:
-                row = {
-                    'Date': last_day_date,
-                    'SubjectCode': item[1],
-                    'Amount': balance_sheet_df[balance_sheet_df['YearMonth'] == yearmonth][item[0]].values[0],
-                    'Remarks': 'Carryover 99'
-                }
-                rows.append(row)
-
-        carryovers = pd.DataFrame(rows)
-        print(carryovers)
-        carryovers = carryovers.astype({
-            'Date': 'str',
-            'SubjectCode': 'str',
-            'Amount': 'int64',
-            'Remarks': 'str'
-        })
-        carryovers = (carryovers.pipe(self.generate_id)
-                                .pipe(self.apply_subject_from_code)
-                                .pipe(self.add_yearmonth_column)
-                                .pipe(self.remove_duplicates))
-        df = pd.concat([df, carryovers], ignore_index=True)
-        df['ID'] = df['ID'].astype(str)
-        df = self.remove_duplicates(df)
-        df = self.sort_csv(df)
-        return df
+        for initial in [['TotalEquity','300'],['NetIncome','600']]:
+            row1 = {
+                'YearMonth': closing_day,
+                'SubjectCode': initial[1],
+                'Amount': sum_of_categories[initial[0]].values[0],
+                'Remarks': 'Carryover '+ initial[1]
+            }
+            row2 = {
+                'YearMonth': next_first_day_date,
+                'SubjectCode': initial[1],
+                'Amount': sum_of_categories[initial[0]].values[0],
+                'Remarks': 'Carryover '+ initial[1]
+            }
+            carryover_data.append(row1)
+            carryover_data.append(row2)
+        for initial in ['1','2']:
+            for item in sum_of_subjects.columns:
+                if str(item).startswith(initial):
+                    row = {
+                        'YearMonth': closing_day,
+                        'SubjectCode': item,
+                        'Amount': sum_of_subjects[item].values[0],
+                        'Remarks': 'Carryover '+ str(item)
+                    }
+                    carryover_data.append(row)
+        carryover_df = pd.DataFrame(carryover_data)
+        return carryover_df
 
     def process_csv(self):
         """
@@ -319,7 +268,7 @@ class CSVProcessor:
         balansheet_df = self.calculate_balances(pivot_df)
         pd.to_csv(balansheet_df, self.balancesheet_path)
 
-        datas = self.month_close_and_carryover(datas, balansheet_df,pivot_df)
+        carryover_datas = self.get_carryover_data(datas, balansheet_df,pivot_df)
 
         # 処理されたデータを新しいCSVファイルに保存する
         datas.to_csv(self.output_file, index=False)
