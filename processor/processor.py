@@ -14,7 +14,7 @@ class CSVProcessor:
         self.input_file = input_file
         self.output_file = output_file
         self.code_file = subjectcodes_path
-        self.summery_file = summary_file
+        self.summary_file = summary_file
         self.carryover_df = None
         self.yearmonth = None
 
@@ -250,10 +250,12 @@ class CSVProcessor:
                     .pipe(self.sort_csv)
                     .pipe(self.add_yearmonth_column)
                     .pipe(self.remove_duplicates))
+        summary = pd.DataFrame()
 
         for yearmonth in datas['YearMonth'].unique():
             self.yearmonth = yearmonth
             sum_of_subjects,sum_of_categories = self.get_monthly_summery(datas)
+            summary = summary.append(sum_of_subjects)
             carryover_datas = self.get_carryover_data(sum_of_subjects,sum_of_categories)
             datas = pd.concat([datas,carryover_datas],ignore_index=True)
             datas = (datas.pipe(self.generate_id)
@@ -261,8 +263,9 @@ class CSVProcessor:
                         .pipe(self.sort_csv)
                         .pipe(self.add_yearmonth_column)
                         .pipe(self.remove_duplicates))
+            print(f"Processing {yearmonth} completed.")
 
         # 処理されたデータを新しいCSVファイルに保存する
         datas.to_csv(self.output_file, index=False)
-        sum_of_subjects.to_csv(self.summery_file,index=False)
+        summary.to_csv(self.summary_file,index=False)
         return print("CSV processing completed.")
