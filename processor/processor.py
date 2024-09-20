@@ -85,7 +85,6 @@ class CSVProcessor:
         Returns:
             dataframe: Dataframe with 'Subject' columns added as string
         """
-        print(df.columns)
         df['Subject'] = df.apply(lambda data: self.find_by_id(data['SubjectCode']),axis=1)
         return df
 
@@ -262,12 +261,8 @@ class CSVProcessor:
                         .pipe(self.sort_csv)
                         .pipe(self.add_yearmonth_column)
                         .pipe(self.remove_duplicates))
-        pivot_df = self.preprocess_and_pivot(datas)
-        balansheet_df = self.calculate_balances(pivot_df)
-        pd.to_csv(balansheet_df, self.balancesheet_path)
-
-        carryover_datas = self.get_carryover_data(datas, balansheet_df,pivot_df)
 
         # 処理されたデータを新しいCSVファイルに保存する
         datas.to_csv(self.output_file, index=False)
+        sum_of_subjects.to_csv('sum_of_subjects.csv',index=False)
         return print("CSV processing completed.")

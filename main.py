@@ -10,21 +10,3 @@ codes_path = 'codes.json'
 """
 CSVを読み込んで処理を行う
 """
-
-# CSVProcessorクラスのインスタンスを作成
-csv_processor = CSVProcessor(init_data_path, output_modified_path,codes_path)
-
-# CSVファイルの処理を行う
-csv_processor.process_csv()
-
-"""
-バランスシートを生成して保存する
-"""
-
-# バランスシートの生成と保存
-print(carryover_df)
-
-# 繰り越しデータを加えたCSVを完成版のものとして保存
-closing_file_path = 'datas/test_closing.csv'
-csv_processor.month_end_close(carryover_df, closing_file_path)
-print("Month-end closing completed.")
