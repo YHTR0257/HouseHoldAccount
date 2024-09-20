@@ -1,12 +1,8 @@
 from processor.processor import CSVProcessor
 
-init_data_path = 'datas/test.csv'
-output_modified_path = 'datas/test_modified.csv'
-
-input_file_path = 'datas/test_modified.csv'
-output_summary_path = 'datas/testbalance_sheet.csv'
-codes_path = 'codes.json'
-
-"""
-CSVを読み込んで処理を行う
-"""
+if __name__ == '__main__':
+    csv_processor = CSVProcessor(input_file='datas/financial_records.csv',
+                                 output_file='datas/results_financial.csv',
+                                 subjectcodes_path='codes.csv',
+                                 summary_file='datas/summary.csv',)
+    csv_processor.process_csv()

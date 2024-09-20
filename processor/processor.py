@@ -10,11 +10,11 @@ class CSVProcessor:
     """
     CSVファイルを処理するクラス
     """
-    def __init__(self, input_file, output_file,subjectcodes_path,balance_sheet_path=None):
+    def __init__(self, input_file, output_file,subjectcodes_path,summary_file):
         self.input_file = input_file
         self.output_file = output_file
         self.code_file = subjectcodes_path
-        self.balancesheet_path = balance_sheet_path
+        self.summery_file = summary_file
         self.carryover_df = None
         self.yearmonth = None
 
@@ -264,5 +264,5 @@ class CSVProcessor:
 
         # 処理されたデータを新しいCSVファイルに保存する
         datas.to_csv(self.output_file, index=False)
-        sum_of_subjects.to_csv('sum_of_subjects.csv',index=False)
+        sum_of_subjects.to_csv(self.summery_file,index=False)
         return print("CSV processing completed.")

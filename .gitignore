@@ -4,8 +4,6 @@
 # or operating system, you probably want to add a global ignore instead:
 #   git config --global core.excludesfile '~/.gitignore_global'
 
-datas/
-
 # Ignore log files
 *.log
 
@@ -35,3 +33,12 @@ Thumbs.db
 # Ignore chache files
 .cache/
 __pycache__/
+
+# Ignore private files
+*./datas/*.csv
+*.key
+*.pem
+*.p12
+*.pfx
+*.cer
+*.crt
