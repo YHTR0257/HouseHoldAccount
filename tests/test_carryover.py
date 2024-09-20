@@ -1,50 +1,67 @@
 from processor.processor import CSVProcessor
 import pandas as pd
 
-def test_caluculate_balances():
-    csv_processor = CSVProcessor('tests/test.csv', None, subjectcodes_path='codes.csv',balance_sheet_path=None)
-    sample_data = {
-        'YearMonth': ['2024-01', '2024-02'],
-        '100': [-400, -400],
-        '101': [500, 600],
-        '200': [-300, -400],
-        '400': [-500, -600],
-        '500': [700, 800]
-    }
-    df = pd.DataFrame(sample_data)
-    balances_df = csv_processor.calculate_balances(df)
-    expected_balancesheet = {
-        'YearMonth': ['2024-01', '2024-02'],
-        'TotalAssets': [100, 200],
-        'TotalLiabilities': [-300, -400],
-        'TotalIncome': [-500, -600],
-        'TotalExpenses': [700, 800],
-        'NetIncome': [-200, -200],
-        'TotalEquity': [200, 200]
-    }
-    expected_balance_df = pd.DataFrame(expected_balancesheet, columns=['YearMonth', 'TotalAssets', 'TotalLiabilities', 'TotalIncome', 'TotalExpenses', 'NetIncome', 'TotalEquity'])
+class TestCSVProcessor:
+    def test_get_monthly_summery(self):
+        csv_processor = CSVProcessor('tests/test.csv', None, subjectcodes_path='codes.csv',balance_sheet_path=None)
+        test_data = {
+            'YearMonth': ['2024-01', '2024-01', '2024-01', '2024-01'],
+            'SubjectCode': ['100', '200', '400', '500'],
+            'Amount': [2000, -1000, -2000, 1000]
+        }
+        df = pd.DataFrame(test_data)
+        print(df)
+        csv_processor.yearmonth = '2024-01'
+        sum_of_subjects, sum_of_categories = csv_processor.get_monthly_summery(df)
+        expected_sum_of_subjects = {
+            'YearMonth': ['2024-01'],
+            '100': [2000],
+            '200': [-1000],
+            '400': [-2000],
+            '500': [1000]
+        }
+        expected_sum_of_categories = {
+            'YearMonth': ['2024-01'],
+            'TotalAssets': [2000],
+            'TotalLiabilities': [-1000],
+            'TotalIncome': [-2000],
+            'TotalExpenses': [1000],
+            'NetIncome': [1000],
+            'TotalEquity': [-1000]
+        }
+        expected_sum_of_subjects_df = pd.DataFrame(expected_sum_of_subjects)
+        expected_sum_of_categories_df = pd.DataFrame(expected_sum_of_categories)
 
-    pd.testing.assert_frame_equal(balances_df, expected_balance_df)
+        sum_of_subjects.columns.name = None
+        sum_of_categories.columns.name = None
+        expected_sum_of_subjects_df = expected_sum_of_subjects_df.astype({col: int for col in expected_sum_of_subjects_df.columns if col != 'YearMonth'})
+        expected_sum_of_categories_df = expected_sum_of_categories_df.astype({col: int for col in expected_sum_of_categories_df.columns if col != 'YearMonth'})
+        print("sum_of_subjects \n", sum_of_subjects)
+        print(sum_of_subjects.columns)
+        print(expected_sum_of_subjects_df.head(1))
+        print("sum_of_categories \n",sum_of_categories)
+        print(expected_sum_of_categories_df.head(1))
+        pd.testing.assert_frame_equal(sum_of_subjects, expected_sum_of_subjects_df)
+        pd.testing.assert_frame_equal(sum_of_categories, expected_sum_of_categories_df)
 
-def test_getting_subject_sum():
-    csv_processor = CSVProcessor(None, None, subjectcodes_path='codes.csv',balance_sheet_path=None)
-    df = pd.read_csv('tests/test.csv')
-    df = csv_processor.add_yearmonth_column(df)
-    sums_subject,sums_category = csv_processor.get_subject_sum(df)
-    expected_data = {
-        'YearMonth': ['2024-03', '2024-04'],
-        'TotalAssets': [-6000, -6000],
-        'TotalLiabilities': [-4000, -4000],
-        'TotalIncome': [-5500, -5500],
-        'TotalExpenses': [15500, 15500],
-        'TotalEquity': [10000, 10000],
-        'NetIncome': [-10000, -10000]
-    }
+    def test_get_carryover_data(self):
+        csv_processor = CSVProcessor('tests/test.csv', None, subjectcodes_path='codes.csv',balance_sheet_path=None)
+        test_data = {
+            'YearMonth': ['2024-01', '2024-01', '2024-01', '2024-01'],
+            'SubjectCode': ['100', '200', '400', '500'],
+            'Amount': [2000, -1000, -2000, 1000]
+        }
+        df = pd.DataFrame(test_data)
 
-def test_month_close_and_carryover():
-    csv_processor = CSVProcessor(None,None, subjectcodes_path='codes.csv',balance_sheet_path=None)
-    test_df = pd.read_csv('tests/carryover.csv')
-    expected_data = pd.read_csv('tests/carryover_expected.csv')
-    test_pivot_df = csv_processor.preprocess_and_pivot(test_df)
-    actual_data = csv_processor.month_close_and_carryover(test_df, test_pivot_df)
-    pd.testing.assert_frame_equal(actual_data, expected_data)
+        csv_processor.yearmonth = '2024-01'
+        sum_of_subjects, sum_of_categories = csv_processor.get_monthly_summery(df)
+        carryover_data = csv_processor.get_carryover_data(sum_of_subjects, sum_of_categories)
+        expected_carryover_data = {
+            'Date': ['2024-01-31', '2024-01-31','2024-02-01','2024-02-01', '2024-02-01'],
+            'SubjectCode': ['300', '600', '100', '200','300'],
+            'Amount': [-1000, 1000, 2000, -1000, -1000],
+            'Remarks': ['Carryover 300', 'Carryover 600', 'Carryover 100', 'Carryover 200', 'Carryover 300']
+        }
+        expected_carryover_data_df = pd.DataFrame(expected_carryover_data)
+        expected_carryover_data_df = expected_carryover_data_df.sort_values(by=['Date', 'SubjectCode']).reset_index(drop=True)
+        pd.testing.assert_frame_equal(carryover_data, expected_carryover_data_df)
