@@ -142,13 +142,13 @@ class CSVProcessor:
 
         # ピボットとフォーマット 月ごとの科目別合計金額を計算
         # sum_of_subjectは、月ごとの科目別合計金額を持つDataFrame 行は月、列は科目コード
-        sum_of_subjects = df.pivot_table(index='YearMonth', columns='SubjectCode', values='Amount', aggfunc='sum').reset_index()
+        sum_of_subjects = df.pivot_table(index='YearMonth', columns='SubjectCode', values='Amount', aggfunc=np.sum).reset_index()
         sum_of_subjects = sum_of_subjects.fillna(0)
 
         each_category_rows = []
         for category in ['1','2','4','5']:
             category_items = []
-            for item in df['SubjectCode']:
+            for item in df['SubjectCode'].unique():
                 if item.startswith(category):
                     category_row = {
                         'YearMonth': self.yearmonth,
@@ -160,20 +160,20 @@ class CSVProcessor:
             category_sum = pd.to_numeric(category_items['Amount'], errors='coerce').sum()
             each_category_row = {
                 'YearMonth': self.yearmonth,
-                'SubjectCode': category[0] + '00',
+                'Category': category[0] + '000',
                 'Amount': category_sum
             }
             each_category_rows.append(each_category_row)
         sum_of_categories = pd.DataFrame(each_category_rows)
-        sum_of_categories = sum_of_categories.pivot_table(index='YearMonth',columns='SubjectCode',values='Amount').reset_index()
+        sum_of_categories = sum_of_categories.pivot_table(index='YearMonth',columns='Category',values='Amount').reset_index()
         #Caluculate net income and total equity
-        sum_of_categories['NetIncome'] = 0 - sum_of_categories['400'] - sum_of_categories['500']
-        sum_of_categories['TotalEquity'] = 0 - sum_of_categories['100'] - sum_of_categories['200']
+        sum_of_categories['TotalEquity'] = 0 - sum_of_categories['1000'] - sum_of_categories['2000']
+        sum_of_categories['NetIncome'] = 0 - sum_of_categories['4000'] - sum_of_categories['5000']
         sum_of_categories = sum_of_categories.rename(columns={
-            '100':'TotalAssets',
-            '200':'TotalLiabilities',
-            '400':'TotalIncome',
-            '500':'TotalExpenses'
+            '1000':'TotalAssets',
+            '2000':'TotalLiabilities',
+            '4000':'TotalIncome',
+            '5000':'TotalExpenses'
             })
         sum_of_subjects = sum_of_subjects.astype({col: int for col in sum_of_subjects.columns if col != 'YearMonth'})
         sum_of_categories = sum_of_categories.astype({col: int for col in sum_of_categories.columns if col != 'YearMonth'})
@@ -250,12 +250,14 @@ class CSVProcessor:
                     .pipe(self.sort_csv)
                     .pipe(self.add_yearmonth_column)
                     .pipe(self.remove_duplicates))
-        summary = pd.DataFrame()
+        subject_summary = pd.DataFrame()
+        category_summary = pd.DataFrame()
 
         for yearmonth in datas['YearMonth'].unique():
             self.yearmonth = yearmonth
             sum_of_subjects,sum_of_categories = self.get_monthly_summery(datas)
-            summary = summary.append(sum_of_subjects)
+            subject_summary = subject_summary.append(sum_of_subjects)
+            category_summary = category_summary.append(sum_of_categories)
             carryover_datas = self.get_carryover_data(sum_of_subjects,sum_of_categories)
             datas = pd.concat([datas,carryover_datas],ignore_index=True)
             datas = (datas.pipe(self.generate_id)
@@ -264,6 +266,19 @@ class CSVProcessor:
                         .pipe(self.add_yearmonth_column)
                         .pipe(self.remove_duplicates))
             print(f"Processing {yearmonth} completed.")
+
+        # Summaryの列を並び替え
+        summary_columns  = subject_summary.columns.tolist()
+        summary_columns.remove('YearMonth')
+        summary_columns.sort()
+        summary_columns.insert(0,'YearMonth')
+        subject_summary = subject_summary[summary_columns]
+
+        category_summary = category_summary[['YearMonth','TotalAssets','TotalLiabilities','TotalEquity','TotalIncome','TotalExpenses','NetIncome']]
+
+        summary = pd.merge(subject_summary,category_summary,on='YearMonth')
+        summary = summary.fillna(0)
+        summary = summary.astype({col: int for col in summary.columns if col != 'YearMonth'})
 
         # 処理されたデータを新しいCSVファイルに保存する
         datas.to_csv(self.output_file, index=False)

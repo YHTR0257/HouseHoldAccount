@@ -3,7 +3,7 @@ import pandas as pd
 
 class TestCSVProcessor:
     def test_get_monthly_summery(self):
-        csv_processor = CSVProcessor('tests/test.csv', None, subjectcodes_path='codes.csv',balance_sheet_path=None)
+        csv_processor = CSVProcessor('tests/test.csv', None, subjectcodes_path='codes.csv',summary_file=None)
         test_data = {
             'YearMonth': ['2024-01', '2024-01', '2024-01', '2024-01'],
             'SubjectCode': ['100', '200', '400', '500'],
@@ -45,7 +45,7 @@ class TestCSVProcessor:
         pd.testing.assert_frame_equal(sum_of_categories, expected_sum_of_categories_df)
 
     def test_get_carryover_data(self):
-        csv_processor = CSVProcessor('tests/test.csv', None, subjectcodes_path='codes.csv',balance_sheet_path=None)
+        csv_processor = CSVProcessor('tests/test.csv', None, subjectcodes_path='codes.csv',summary_file=None)
         test_data = {
             'YearMonth': ['2024-01', '2024-01', '2024-01', '2024-01'],
             'SubjectCode': ['100', '200', '400', '500'],
