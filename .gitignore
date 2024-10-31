@@ -35,7 +35,7 @@ Thumbs.db
 __pycache__/
 
 # Ignore private files
-*./datas/*.csv
+./datas/*.csv
 *.key
 *.pem
 *.p12
