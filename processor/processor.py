@@ -10,52 +10,56 @@ class CSVProcessor:
     """
     CSVファイルを処理するクラス
     """
-    def __init__(self, input_file, output_file,subjectcodes_path,summary_file):
+    def __init__(self, input_file, output_file,summary_file,subjectcodes_path='./codes.csv'):
         self.input_file = input_file
         self.output_file = output_file
-        self.code_file = subjectcodes_path
         self.summary_file = summary_file
         self.carryover_df = None
         self.yearmonth = None
+        try:
+            with open(subjectcodes_path, 'r', encoding='utf-8') as f:
+                self.codes = pd.read_csv(f, dtype={'id':str,'subject':str})
+        except FileNotFoundError:
+            print(f"Error: File '{subjectcodes_path}' not found.")
+            return None
 
-    def generate_id(self, datas):
+    def generate_single_id(self, row):
         """
-        Generate IDs for each row in the datas DataFrame based on the specified rules.
-
+        IDを生成する
         Args:
-            datas (pd.DataFrame): DataFrame containing 'Date', 'Amount', 'Remarks', and optionally 'ID'.
-                Date (str): Date in the format 'YYYY-MM-DD'.
-                Amount (float): Transaction amount.
-                Remarks (str): Remarks for the transaction.
-                ID (int, optional): Transaction ID. If not provided, it will be generated.
-
+            row (Series): 行
         Returns:
-            pd.DataFrame: The input DataFrame with an added/updated 'ID' column.
+            int: 生成されたID
         """
-        def generate_single_id(row):
-            existing_id = row.get('ID')
-            if pd.isna(existing_id) or existing_id is None:
-                date_str = row['Date']
-                date_part = date_str.replace("-", "")
-                amount = row['Amount']
-                sign = "1" if float(amount) >= 0 else "0"
-                remark = row['Remarks']
-                remark_suffix = remark[-3:] if len(remark) >= 3 else remark
-                # IDを生成し、Remarkの後ろ3文字を連結
-                generated_id = f"{date_part}{remark_suffix}{sign}"
-                return int(generated_id)
-            else:
-                return int(existing_id)
+        existing_id = row.get('ID')
+        if pd.isna(existing_id) or existing_id is None:
+            date_str = row['Date']
+            amount = row['Amount']
+            sign = "1" if float(amount) >= 0 else "0"
+            remark = row['Remarks']
+            remark_suffix = remark[-3:] if len(remark) >= 3 else remark
+            # IDを生成し、Remarkの後ろ3文字を連結
+            generated_id = f"{date_str}{remark_suffix}{sign}"
+            return str(generated_id)
+        else:
+            return str(existing_id)
 
-        # Apply the generate_single_id function to each row in the DataFrame
-        datas['ID'] = datas.apply(generate_single_id, axis=1)
-        return datas
-
-    def fill_remarks(self):
+    def fill_param(self,df):
         """
-        備考欄を埋める
+        Add Category from code
+        Returns:
+            dataframe: Dataframe with 'Category', 'CategoryName', 'CategoryNum' and 'ID'
+            columns added as string
         """
-        pass
+        for index, row in df.iterrows():
+            item = self.find_by_id(row['SubjectCode'])
+            if item is not None:
+                id = self.generate_single_id(row)
+                df.loc[index, 'Subject'] = item['subject'].values[0]
+                df.loc[index, 'CategoryName'] = item['category_name'].values[0]
+                df.loc[index, 'CategoryNum'] = str(item['category_num'].values[0])
+                df.loc[index, 'ID'] = id
+        return df
 
     def sort_csv(self,datas):
         """
@@ -101,19 +105,11 @@ class CSVProcessor:
             print(f"Error: ID '{search_id}' is not a valid ID.")
             return None
         search_id=str(search_id)
-        try:
-            # JSONファイルを読み込む
-            with open(self.code_file, 'r', encoding='utf-8') as f:
-                #dtype: id: str, subject: str
-                data = pd.read_csv(f, dtype={'id':str,'subject':str})
-        except FileNotFoundError:
-            print(f"Error: File '{self.code_file}' not found.")
-            return None
 
         # 指定されたidを持つ要素を検索
         try:
-            subject = data[data['id'] == search_id]['subject'].values[0]
-            return subject
+            item = self.codes[self.codes['id'] == search_id]
+            return item
         except IndexError:
             print(f"Error: ID '{search_id}' not found in the codes file.")
             return None
