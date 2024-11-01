@@ -1,67 +1,104 @@
-from processor.processor import CSVProcessor
 import pandas as pd
+import pytest
+
+from processor.processor import CSVProcessor
 
 class TestCSVProcessor:
-    def test_get_monthly_summery(self):
-        csv_processor = CSVProcessor('tests/test.csv', None, subjectcodes_path='codes.csv',summary_file=None)
-        test_data = {
-            'YearMonth': ['2024-01', '2024-01', '2024-01', '2024-01'],
-            'SubjectCode': ['100', '200', '400', '500'],
-            'Amount': [2000, -1000, -2000, 1000]
-        }
-        df = pd.DataFrame(test_data)
-        print(df)
-        csv_processor.yearmonth = '2024-01'
-        sum_of_subjects, sum_of_categories = csv_processor.get_monthly_summery(df)
-        expected_sum_of_subjects = {
-            'YearMonth': ['2024-01'],
-            '100': [2000],
-            '200': [-1000],
-            '400': [-2000],
-            '500': [1000]
-        }
-        expected_sum_of_categories = {
-            'YearMonth': ['2024-01'],
-            'TotalAssets': [2000],
-            'TotalLiabilities': [-1000],
-            'TotalIncome': [-2000],
-            'TotalExpenses': [1000],
-            'NetIncome': [1000],
-            'TotalEquity': [-1000]
-        }
-        expected_sum_of_subjects_df = pd.DataFrame(expected_sum_of_subjects)
-        expected_sum_of_categories_df = pd.DataFrame(expected_sum_of_categories)
+    def setup_class(self):
+        self.csv_processor = CSVProcessor('tests/test.csv', 'tests/result.csv', subjectcodes_path='codes.csv', summary_file='tests/summary.csv')
+        self.test_data = pd.read_csv('tests/test.csv', dtype={'Date': 'str', 'SubjectCode': 'str', 'Amount': 'int'})
+        self.test_data = self.csv_processor.fill_param(self.test_data)
+        self.test_data = self.csv_processor.add_yearmonth_column(self.test_data)
 
-        sum_of_subjects.columns.name = None
-        sum_of_categories.columns.name = None
-        expected_sum_of_subjects_df = expected_sum_of_subjects_df.astype({col: int for col in expected_sum_of_subjects_df.columns if col != 'YearMonth'})
-        expected_sum_of_categories_df = expected_sum_of_categories_df.astype({col: int for col in expected_sum_of_categories_df.columns if col != 'YearMonth'})
-        print("sum_of_subjects \n", sum_of_subjects)
-        print(sum_of_subjects.columns)
-        print(expected_sum_of_subjects_df.head(1))
-        print("sum_of_categories \n",sum_of_categories)
-        print(expected_sum_of_categories_df.head(1))
-        pd.testing.assert_frame_equal(sum_of_subjects, expected_sum_of_subjects_df)
-        pd.testing.assert_frame_equal(sum_of_categories, expected_sum_of_categories_df)
+    def test_a_month_summary(self):
+        test_data = self.test_data[self.test_data['YearMonth'] == '202403']
+        test_s_sbj, test_pv_cat, test_pv_sbj = self.csv_processor.get_monthly_summary(test_data)
 
-    def test_get_carryover_data(self):
-        csv_processor = CSVProcessor('tests/test.csv', None, subjectcodes_path='codes.csv',summary_file=None)
-        test_data = {
-            'YearMonth': ['2024-01', '2024-01', '2024-01', '2024-01'],
-            'SubjectCode': ['100', '200', '400', '500'],
-            'Amount': [2000, -1000, -2000, 1000]
-        }
-        df = pd.DataFrame(test_data)
+        test_pv_cat = test_pv_cat.astype({'1': 'int32', '2': 'int32', '3': 'int32', '4': 'int32', '5': 'int32', '6': 'int32'})
+        test_pv_cat.columns.name = None
+        test_pv_cat = test_pv_cat[['YearMonth', '1', '2', '3', '4', '5', '6']]
+        test_pv_cat.reset_index(drop=True)
 
-        csv_processor.yearmonth = '2024-01'
-        sum_of_subjects, sum_of_categories = csv_processor.get_monthly_summery(df)
-        carryover_data = csv_processor.get_carryover_data(sum_of_subjects, sum_of_categories)
-        expected_carryover_data = {
-            'Date': ['2024-01-31', '2024-01-31','2024-02-01','2024-02-01', '2024-02-01'],
-            'SubjectCode': ['300', '600', '100', '200','300'],
-            'Amount': [-1000, 1000, 2000, -1000, -1000],
-            'Remarks': ['Carryover 300', 'Carryover 600', 'Carryover 100', 'Carryover 200', 'Carryover 300']
-        }
-        expected_carryover_data_df = pd.DataFrame(expected_carryover_data)
-        expected_carryover_data_df = expected_carryover_data_df.sort_values(by=['Date', 'SubjectCode']).reset_index(drop=True)
-        pd.testing.assert_frame_equal(carryover_data, expected_carryover_data_df)
+        test_pv_sbj.columns.name = None
+
+        s_sbj = {
+            'YearMonth': ['202403', '202403', '202403', '202403', '202403', '202403', '202403'],
+            'CategoryNum': ['1', '2', '4', '4', '5', '5', '5'],
+            'SubjectCode': ['101', '200', '400', '490', '500', '531', '590'],
+            'Amount': [-7500, -1500, -5000, -500, 3000, 1500, 10000],
+            'Remarks': ['Carryover 101', 'Carryover 200', 'Carryover 400', 'Carryover 490', 'Carryover 500', 'Carryover 531', 'Carryover 590']
+            }
+
+        pv_cat = {
+            'YearMonth': ['202403'],
+            '1': [-7500],
+            '2': [-1500],
+            '3': [9000],
+            '4': [-5500],
+            '5': [14500],
+            '6': [-9000]
+            }
+
+        pv_sbj = {
+            'YearMonth': ['202403'],
+            '101' : [-7500],
+            '200' : [-1500],
+            '400' : [-5000],
+            '490' : [-500],
+            '500' : [3000],
+            '531' : [1500],
+            '590' : [10000]
+            }
+
+        expected_s_sbj = pd.DataFrame(s_sbj)
+        expected_s_sbj = expected_s_sbj.astype({'Amount': 'int32'})
+        expected_pv_cat = pd.DataFrame(pv_cat)
+        expected_pv_cat = expected_pv_cat.astype({'1': 'int32', '2': 'int32', '3': 'int32', '4': 'int32', '5': 'int32', '6': 'int32'})
+        expected_pv_sbj = pd.DataFrame(pv_sbj)
+        expected_pv_sbj = expected_pv_sbj.astype({'101': 'int32', '200': 'int32', '400': 'int32', '490': 'int32', '500': 'int32', '531': 'int32', '590': 'int32'})
+
+        # Validate sums_subject
+        assert not test_s_sbj.empty
+        assert 'Remarks' in test_s_sbj.columns
+        assert 'Amount' in test_s_sbj.columns
+        assert 'SubjectCode' in test_s_sbj.columns
+        assert 'CategoryNum' in test_s_sbj.columns
+        assert 'YearMonth' in test_s_sbj.columns
+        pd.testing.assert_frame_equal(test_s_sbj, expected_s_sbj)
+
+        # Validate sums_category
+        assert not test_pv_cat.empty
+        assert 'YearMonth' in test_pv_cat.columns
+        assert '1' in test_pv_cat.columns
+        assert '2' in test_pv_cat.columns
+        assert '3' in test_pv_cat.columns
+        assert '4' in test_pv_cat.columns
+        assert '5' in test_pv_cat.columns
+        assert '6' in test_pv_cat.columns
+        print(test_pv_cat)
+        print(expected_pv_cat)
+        pd.testing.assert_frame_equal(test_pv_cat, expected_pv_cat)
+
+        # Validate pv_subject
+        assert not test_pv_sbj.empty
+        assert 'YearMonth' in test_pv_sbj.columns
+        assert '101' in test_pv_sbj.columns
+        assert '200' in test_pv_sbj.columns
+        assert '400' in test_pv_sbj.columns
+        assert '490' in test_pv_sbj.columns
+        assert '500' in test_pv_sbj.columns
+        assert '531' in test_pv_sbj.columns
+        assert '590' in test_pv_sbj.columns
+        pd.testing.assert_frame_equal(test_pv_sbj, expected_pv_sbj)
+
+    def test_get_monthly_summary_empty(self):
+        test_data = self.test_data[self.test_data['YearMonth'] == '202504']
+        test_s_sbj, test_s_cat, test_pv_sbj = self.csv_processor.get_monthly_summary(test_data)
+
+        expected_s_sbj = pd.DataFrame(columns=['YearMonth', 'CategoryNum', 'SubjectCode', 'Amount', 'Remarks'])
+        expected_s_cat = pd.DataFrame(columns=['YearMonth', 'CategoryNum', 'CategoryName', 'Amount'])
+        expected_pv_sbj = pd.DataFrame(columns=['YearMonth'])
+
+        pd.testing.assert_frame_equal(test_s_sbj, expected_s_sbj)
+        pd.testing.assert_frame_equal(test_s_cat, expected_s_cat)
+        pd.testing.assert_frame_equal(test_pv_sbj, expected_pv_sbj)

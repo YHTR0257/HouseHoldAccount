@@ -33,9 +33,10 @@ class CSVProcessor:
         """
         existing_id = row.get('ID')
         if pd.isna(existing_id) or existing_id is None:
-            date_str = row['Date']
+            date_str = str(row['Date'])
+            date_str = dt.datetime.strptime(date_str, '%Y%m%d').strftime('%Y%m%d')
             amount = row['Amount']
-            sign = "1" if float(amount) >= 0 else "0"
+            sign = "1" if int(amount) >= 0 else "0"
             remark = row['Remarks']
             remark_suffix = remark[-3:] if len(remark) >= 3 else remark
             # IDを生成し、Remarkの後ろ3文字を連結
@@ -58,7 +59,7 @@ class CSVProcessor:
                 df.loc[index, 'Subject'] = item['subject'].values[0]
                 df.loc[index, 'CategoryName'] = item['category_name'].values[0]
                 df.loc[index, 'CategoryNum'] = str(item['category_num'].values[0])
-                df.loc[index, 'ID'] = id
+                df.loc[index, 'ID'] = str(id)
         return df
 
     def sort_csv(self,datas):
@@ -80,7 +81,7 @@ class CSVProcessor:
         df['Date']=pd.to_datetime(df['Date'])
         df['Year']=df['Date'].dt.year
         df['Month']=df['Date'].dt.month
-        df['YearMonth'] = df['Date'].apply(lambda x: x.strftime('%Y-%m'))
+        df['YearMonth'] = df['Date'].apply(lambda x: x.strftime('%Y%m'))
         return df
 
     def apply_subject_from_code(self,df):
@@ -94,17 +95,17 @@ class CSVProcessor:
 
     def find_by_id(self, search_id):
         """
-        JSONファイルから指定されたIDの要素を検索する
+        codefileから指定されたIDの要素を検索する
         Args:
             search_id (str): 検索するID
         Returns:
             str: 見つかった要素のキー
         """
         # IDが正しいかどうかを確認
+        search_id=str(search_id)
         if not search_id.isdigit():
             print(f"Error: ID '{search_id}' is not a valid ID.")
             return None
-        search_id=str(search_id)
 
         # 指定されたidを持つ要素を検索
         try:
@@ -118,62 +119,53 @@ class CSVProcessor:
         # ID, Date, Amount, Remarksが全て同じ行を削除
         return df.drop_duplicates(subset=['ID', 'Date', 'Amount', 'Remarks'], keep='first')
 
-    def get_monthly_summery(self,df):
+    def get_monthly_summary(self, df):
         """
-        Calculate the sum of each subject code for each month. YearMonth is the index, SubjectCode is the column, and Amount is the value.
-
+        Calculate the sum of each subject code in df
         Args:
-            Dataframe: Dataframe containing 'Date', 'SubjectCode', 'Amount'
-                YearMonth (str): Year and month in 'YYYY-MM' format.
+            Dataframe: Dataframe containing 'YearMonth', 'CategoryNum', 'SubjectCode', 'Amount'
+                YearMonth (str): Year and month in 'YYYYMM' format.
+                CategoryNum (str): Category number which has one order.
                 SubjectCode (str): Subject code.
                 Amount (int): Account amount.
-
         Returns:
-            Dataframe: processed dataframe index is YearMonth, columns are SubjectCode, values are Amount
+            Dataframe: Dataframe containing 'YearMonth', 'CategoryNum', 'SubjectCode', 'Amount', 'Remarks' which is
+            used for carryover data.
+            Dataframe: Dataframe has columns '1', '2', '3', '4', '5', '6' which are the sum of each category.
+            Dataframe: Dataframe has columns 'YearMonth', 'SubjectCode', 'Amount' which are the sum of each subject code.
         """
-        # データの読み込み
-        columns_to_read=['YearMonth','SubjectCode','Amount']
-        df = df[columns_to_read]
-        df = df[df['YearMonth'] == self.yearmonth]
 
-        # ピボットとフォーマット 月ごとの科目別合計金額を計算
-        # sum_of_subjectは、月ごとの科目別合計金額を持つDataFrame 行は月、列は科目コード
-        sum_of_subjects = df.pivot_table(index='YearMonth', columns='SubjectCode', values='Amount', aggfunc=np.sum).reset_index()
-        sum_of_subjects = sum_of_subjects.fillna(0)
+        # Validation check
+        if df.empty:
+            print("No data found.")
+            return pd.DataFrame(columns=['YearMonth', 'CategoryNum', 'SubjectCode', 'Amount', 'Remarks']), pd.DataFrame(columns=['YearMonth', 'CategoryNum', 'CategoryName', 'Amount']), pd.DataFrame(columns=['YearMonth'])
+        # Check if the columns are in the dataframe
+        if not all(col in df.columns for col in ['YearMonth', 'CategoryNum', 'SubjectCode', 'Amount']):
+            print("Columns are missing.")
+            return pd.DataFrame(columns=['YearMonth', 'CategoryNum', 'SubjectCode', 'Amount', 'Remarks']), pd.DataFrame(columns=['YearMonth', 'CategoryNum', 'CategoryName', 'Amount']), pd.DataFrame(columns=['YearMonth'])
 
-        each_category_rows = []
-        for category in ['1','2','4','5']:
-            category_items = []
-            for item in df['SubjectCode'].unique():
-                if item.startswith(category):
-                    category_row = {
-                        'YearMonth': self.yearmonth,
-                        'SubjectCode': item,
-                        'Amount': df[df['SubjectCode'] == item]['Amount'].values[0]
-                    }
-                    category_items.append(category_row)
-            category_items = pd.DataFrame(category_items)
-            category_sum = pd.to_numeric(category_items['Amount'], errors='coerce').sum()
-            each_category_row = {
-                'YearMonth': self.yearmonth,
-                'Category': category[0] + '000',
-                'Amount': category_sum
-            }
-            each_category_rows.append(each_category_row)
-        sum_of_categories = pd.DataFrame(each_category_rows)
-        sum_of_categories = sum_of_categories.pivot_table(index='YearMonth',columns='Category',values='Amount').reset_index()
-        #Caluculate net income and total equity
-        sum_of_categories['TotalEquity'] = 0 - sum_of_categories['1000'] - sum_of_categories['2000']
-        sum_of_categories['NetIncome'] = 0 - sum_of_categories['4000'] - sum_of_categories['5000']
-        sum_of_categories = sum_of_categories.rename(columns={
-            '1000':'TotalAssets',
-            '2000':'TotalLiabilities',
-            '4000':'TotalIncome',
-            '5000':'TotalExpenses'
-            })
-        sum_of_subjects = sum_of_subjects.astype({col: int for col in sum_of_subjects.columns if col != 'YearMonth'})
-        sum_of_categories = sum_of_categories.astype({col: int for col in sum_of_categories.columns if col != 'YearMonth'})
-        return sum_of_subjects, sum_of_categories
+        sums_subject = df.groupby(['YearMonth','CategoryNum','SubjectCode']).agg({'Amount':'sum'}).reset_index()
+        sums_category = df.groupby(['YearMonth','CategoryNum','CategoryName']).agg({'Amount':'sum'}).reset_index()
+        for index, row in sums_subject.iterrows():
+            sums_subject.loc[index, 'Remarks'] = f"Carryover {row['SubjectCode']}"
+        pv_sums_subject = sums_subject.pivot_table(index='YearMonth',columns='SubjectCode',values='Amount').reset_index()
+        pv_sums_category = sums_category.pivot_table(index='YearMonth',columns='CategoryNum',values='Amount').reset_index()
+        print(pv_sums_category)
+        equity = 0 - pv_sums_category.loc[0,'1'] - pv_sums_category.loc[0,'2']
+        netincome = 0 - pv_sums_category.loc[0,'4'] - pv_sums_category.loc[0,'5']
+        pv_sums_category.loc[0, '3'] = int(equity)
+        pv_sums_category.loc[0, '6'] = int(netincome)
+
+        pv_sums_category.columns.name = None
+        pv_sums_category = pv_sums_category[['YearMonth', '1', '2', '3', '4', '5', '6']]
+        pv_sums_category.reset_index(drop=True)
+
+        pv_sums_subject = pv_sums_subject.fillna(0)
+        pv_sums_category = pv_sums_category.fillna(0)
+        sums_subject = sums_subject.fillna(0)
+
+        pv_sums_category.columns.name = None
+        return sums_subject, pv_sums_category, pv_sums_subject
 
     def get_date_for_carryover(self,formatted_day):
         '''
@@ -199,27 +191,27 @@ class CSVProcessor:
 
         return last_day_date, next_first_day_date
 
-    def get_carryover_data(self,sum_of_subjects, sum_of_categories):
-        sum_of_subjects = sum_of_subjects[sum_of_subjects['YearMonth'] == self.yearmonth]
-        sum_of_categories = sum_of_categories[sum_of_categories['YearMonth'] == self.yearmonth]
-        closing_date,next_first_day_date = self.get_date_for_carryover(self.yearmonth+'-01')
+    def get_carryover_data(self,s_sbj, s_cat):
+        s_sbj = s_sbj[s_sbj['YearMonth'] == self.yearmonth]
+        s_cat = s_cat[s_cat['YearMonth'] == self.yearmonth]
+        closing_date,next_first_day_date = self.get_date_for_carryover(self.yearmonth+'01')
         carryover_data = []
 
         for initial in [['TotalEquity','300',closing_date],['TotalEquity','300',next_first_day_date],['NetIncome','600',closing_date]]:
             row1 = {
                 'Date': initial[2],
                 'SubjectCode': initial[1],
-                'Amount': sum_of_categories[initial[0]].values[0],
+                'Amount': s_cat[initial[0]].values[0],
                 'Remarks': 'Carryover '+ initial[1]
             }
             carryover_data.append(row1)
         for initial in ['1','2']:
-            for item in sum_of_subjects.columns:
+            for item in s_sbj.columns:
                 if str(item).startswith(initial):
                     row = {
                         'Date': next_first_day_date,
                         'SubjectCode': item,
-                        'Amount': sum_of_subjects[item].values[0],
+                        'Amount': s_sbj[item].values[0],
                         'Remarks': 'Carryover '+ str(item)
                     }
                     carryover_data.append(row)
@@ -251,10 +243,11 @@ class CSVProcessor:
 
         for yearmonth in datas['YearMonth'].unique():
             self.yearmonth = yearmonth
-            sum_of_subjects,sum_of_categories = self.get_monthly_summery(datas)
+            processdata = datas[datas['YearMonth'] == yearmonth]
+            sum_of_subjects,s_cat = self.get_monthly_summery(datas)
             subject_summary = subject_summary.append(sum_of_subjects)
-            category_summary = category_summary.append(sum_of_categories)
-            carryover_datas = self.get_carryover_data(sum_of_subjects,sum_of_categories)
+            category_summary = category_summary.append(s_cat)
+            carryover_datas = self.get_carryover_data(sum_of_subjects,s_cat)
             datas = pd.concat([datas,carryover_datas],ignore_index=True)
             datas = (datas.pipe(self.generate_id)
                         .pipe(self.apply_subject_from_code)
