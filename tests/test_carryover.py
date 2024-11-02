@@ -102,3 +102,8 @@ class TestCSVProcessor:
         pd.testing.assert_frame_equal(test_s_sbj, expected_s_sbj)
         pd.testing.assert_frame_equal(test_s_cat, expected_s_cat)
         pd.testing.assert_frame_equal(test_pv_sbj, expected_pv_sbj)
+
+    def test_get_date_for_carryover(self):
+        ts_last, ts_fst = self.csv_processor.get_date_for_carryover('20240201')
+        assert ts_last == '20240229'
+        assert ts_fst == '20240301'

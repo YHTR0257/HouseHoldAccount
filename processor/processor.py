@@ -171,53 +171,43 @@ class CSVProcessor:
         '''
         Get the date for the carryover data.
         Args:
-            formatted_day (str): Date string in the format 'YYYY-MM-DD'
+            formatted_day (str): Date string in the format 'YYYYMMDD'
         Returns:
-            datetime: Closing date for the carryover data
-            datetime: Opening date for the carryover data
+            datetime: The last date in formatted_day's month. Closing date for the carryover data
+            datetime: The next 1st in formatted_day's month. Opening date for the carryover data
         '''
 
-        # Parse the formatted_day string to a datetime object
-        date_obj = dt.datetime.strptime(formatted_day, '%Y-%m-%d')
+        date_obj = dt.datetime.strptime(formatted_day, '%Y%m%d')
 
         # Get the last day of the month
-        last_day = calendar.monthrange(date_obj.year, date_obj.month)[1]
-        last_day_date = dt.datetime(date_obj.year, date_obj.month, last_day)
-        last_day_date = last_day_date.strftime('%Y-%m-%d')
+        last_day_date = dt.datetime(date_obj.year, date_obj.month, calendar.monthrange(date_obj.year, date_obj.month)[1])
 
         # Get the first day of the next month
-        next_first_day_date = date_obj + relativedelta(months=1)
-        next_first_day_date = next_first_day_date.strftime('%Y-%m-%d')
+        next_first_day_date = last_day_date + relativedelta(months=1)
+        next_first_day_date = dt.datetime(next_first_day_date.year, next_first_day_date.month, 1)
 
+        last_day_date = last_day_date.strftime('%Y%m%d')
+        next_first_day_date = next_first_day_date.strftime('%Y%m%d')
         return last_day_date, next_first_day_date
 
-    def get_carryover_data(self,s_sbj, s_cat):
-        s_sbj = s_sbj[s_sbj['YearMonth'] == self.yearmonth]
-        s_cat = s_cat[s_cat['YearMonth'] == self.yearmonth]
-        closing_date,next_first_day_date = self.get_date_for_carryover(self.yearmonth+'01')
-        carryover_data = []
+    def get_carryover_data(self,s_sbj, pv_cat):
+        """
+        Get the carryover data for the next month.
+        """
+        carryover_df = pd.DataFrame(columns=['YearMonth', 'CategoryNum', 'SubjectCode', 'Amount', 'Remarks'])
+        # Data validation
+        if s_sbj.empty or pv_cat.empty:
+            print("No data found.")
+            return carryover_df
 
-        for initial in [['TotalEquity','300',closing_date],['TotalEquity','300',next_first_day_date],['NetIncome','600',closing_date]]:
-            row1 = {
-                'Date': initial[2],
-                'SubjectCode': initial[1],
-                'Amount': s_cat[initial[0]].values[0],
-                'Remarks': 'Carryover '+ initial[1]
-            }
-            carryover_data.append(row1)
-        for initial in ['1','2']:
-            for item in s_sbj.columns:
-                if str(item).startswith(initial):
-                    row = {
-                        'Date': next_first_day_date,
-                        'SubjectCode': item,
-                        'Amount': s_sbj[item].values[0],
-                        'Remarks': 'Carryover '+ str(item)
-                    }
-                    carryover_data.append(row)
-        carryover_df = pd.DataFrame(carryover_data)
-        carryover_df = carryover_df.sort_values(by=['Date', 'SubjectCode']).reset_index(drop=True)
-        return carryover_df
+        # Check if the columns are in the dataframe
+        if not all(col in s_sbj.columns for col in ['YearMonth', 'CategoryNum', 'SubjectCode', 'Amount', 'Remarks']):
+            print("Columns are missing.")
+            return carryover_df
+
+        # Get the last day of the month and the first day of the next month
+        last_day_date, next_first_day_date = self.get_date_for_carryover(self.yearmonth + '01')
+
 
     def process_csv(self):
         """
@@ -244,10 +234,7 @@ class CSVProcessor:
         for yearmonth in datas['YearMonth'].unique():
             self.yearmonth = yearmonth
             processdata = datas[datas['YearMonth'] == yearmonth]
-            sum_of_subjects,s_cat = self.get_monthly_summery(datas)
-            subject_summary = subject_summary.append(sum_of_subjects)
-            category_summary = category_summary.append(s_cat)
-            carryover_datas = self.get_carryover_data(sum_of_subjects,s_cat)
+            sums_sbj, pv_cat, pv_sbj = self.get_monthly_summary(processdata)
             datas = pd.concat([datas,carryover_datas],ignore_index=True)
             datas = (datas.pipe(self.generate_id)
                         .pipe(self.apply_subject_from_code)
