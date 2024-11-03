@@ -107,3 +107,24 @@ class TestCSVProcessor:
         ts_last, ts_fst = self.csv_processor.get_date_for_carryover('20240201')
         assert ts_last == '20240229'
         assert ts_fst == '20240301'
+
+    def test_get_carryover_df(self):
+        test_data = self.test_data[self.test_data['YearMonth'] == '202403']
+        test_df = self.csv_processor.get_carryover_df(test_data)
+
+        assert not test_df.empty
+        assert 'Date' in test_df.columns
+        assert 'SubjectCode' in test_df.columns
+        assert 'Amount' in test_df.columns
+        assert 'Remarks' in test_df.columns
+        assert 'Year' in test_df.columns
+        assert 'Month' in test_df.columns
+        assert 'YearMonth' in test_df.columns
+        assert 'ID' in test_df.columns
+        assert 'Subject' in test_df.columns
+        assert 'CategoryName' in test_df.columns
+        assert 'CategoryNum' in test_df.columns
+
+        expected_df = pd.read_csv('tests/test_outputs.csv', dtype={'Date': 'str', 'SubjectCode': 'str', 'Amount': 'int'})
+
+        pd.testing.assert_frame_equal(test_df, expected_df)

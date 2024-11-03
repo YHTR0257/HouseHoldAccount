@@ -32,9 +32,13 @@ class CSVProcessor:
             int: 生成されたID
         """
         existing_id = row.get('ID')
+
+        if isinstance(row['Date'], dt.datetime):
+            date_str = row['Date'].strftime('%Y%m%d')
+        elif isinstance(row['Date'], str):
+            date_str = dt.datetime.strptime(row['Date'], '%Y-%m-%d').strftime('%Y%m%d')
+
         if pd.isna(existing_id) or existing_id is None:
-            date_str = str(row['Date'])
-            date_str = dt.datetime.strptime(date_str, '%Y%m%d').strftime('%Y%m%d')
             amount = row['Amount']
             sign = "1" if int(amount) >= 0 else "0"
             remark = row['Remarks']
@@ -47,11 +51,14 @@ class CSVProcessor:
 
     def fill_param(self,df):
         """
-        Add Category from code
+        Fill in the columns 'Subject', 'CategoryName', 'CategoryNum', 'ID', 'YearMonth', 'Year', 'Month'
+        in the dataframe
         Returns:
             dataframe: Dataframe with 'Category', 'CategoryName', 'CategoryNum' and 'ID'
             columns added as string
         """
+        df['Date'] = df['Date'].apply(lambda x: self.parse_date(x))
+        df = self.add_yearmonth_column(df)
         for index, row in df.iterrows():
             item = self.find_by_id(row['SubjectCode'])
             if item is not None:
@@ -79,8 +86,8 @@ class CSVProcessor:
             yearmongh column added as string
         """
         df['Date']=pd.to_datetime(df['Date'])
-        df['Year']=df['Date'].dt.year
-        df['Month']=df['Date'].dt.month
+        df['Year']=df['Date'].dt.year.astype(str)
+        df['Month']=df['Date'].dt.month.astype(str)
         df['YearMonth'] = df['Date'].apply(lambda x: x.strftime('%Y%m'))
         return df
 
@@ -114,6 +121,36 @@ class CSVProcessor:
         except IndexError:
             print(f"Error: ID '{search_id}' not found in the codes file.")
             return None
+
+    def parse_date(self, date_str, output_format='%Y-%m-%d'):
+        """
+        Attempt to parse date_str with various formats and return it in output_format.
+
+        Args:
+            date_str (str or datetime): Date string to be parsed.
+            output_format (str): Format to output the date in.
+        """
+        if not date_str:
+            return None
+        elif isinstance(date_str, dt.datetime):
+            return date_str.strftime(output_format)
+        elif date_str.isdigit():
+            date_str = str(date_str)
+        elif not isinstance(date_str, str):
+            date_str = str(date_str)
+
+        date_formats = ['%Y%m%d', '%Y-%m-%d']  # 使用する入力フォーマットの候補を追加
+
+        for fmt in date_formats:
+            try:
+                date_obj = dt.datetime.strptime(date_str, fmt)
+                return date_obj.strftime(output_format)
+            except ValueError:
+                continue  # 該当しないフォーマットの場合は次のフォーマットを試す
+
+        print(f"Error: '{date_str}' did not match any known formats.")
+        return None
+
 
     def remove_duplicates(self, df):
         # ID, Date, Amount, Remarksが全て同じ行を削除
@@ -150,11 +187,14 @@ class CSVProcessor:
             sums_subject.loc[index, 'Remarks'] = f"Carryover {row['SubjectCode']}"
         pv_sums_subject = sums_subject.pivot_table(index='YearMonth',columns='SubjectCode',values='Amount').reset_index()
         pv_sums_category = sums_category.pivot_table(index='YearMonth',columns='CategoryNum',values='Amount').reset_index()
-        print(pv_sums_category)
+        cat_nums = ['1','2','3','4','5','6']
+        for num in cat_nums:
+            if num not in pv_sums_category.columns:
+                pv_sums_category[num] = 0
         equity = 0 - pv_sums_category.loc[0,'1'] - pv_sums_category.loc[0,'2']
-        netincome = 0 - pv_sums_category.loc[0,'4'] - pv_sums_category.loc[0,'5']
+        pro_loss = 0 - pv_sums_category.loc[0,'4'] - pv_sums_category.loc[0,'5']
         pv_sums_category.loc[0, '3'] = int(equity)
-        pv_sums_category.loc[0, '6'] = int(netincome)
+        pv_sums_category.loc[0, '6'] = int(pro_loss)
 
         pv_sums_category.columns.name = None
         pv_sums_category = pv_sums_category[['YearMonth', '1', '2', '3', '4', '5', '6']]
@@ -186,15 +226,15 @@ class CSVProcessor:
         next_first_day_date = last_day_date + relativedelta(months=1)
         next_first_day_date = dt.datetime(next_first_day_date.year, next_first_day_date.month, 1)
 
-        last_day_date = last_day_date.strftime('%Y%m%d')
-        next_first_day_date = next_first_day_date.strftime('%Y%m%d')
+        last_day_date = last_day_date.strftime('%Y-%m-%d')
+        next_first_day_date = next_first_day_date.strftime('%Y-%m-%d')
         return last_day_date, next_first_day_date
 
     def get_carryover_data(self,s_sbj, pv_cat):
         """
         Get the carryover data for the next month.
         """
-        carryover_df = pd.DataFrame(columns=['YearMonth', 'CategoryNum', 'SubjectCode', 'Amount', 'Remarks'])
+        carryover_df = pd.DataFrame(columns=['Date', 'CategoryNum', 'SubjectCode', 'Amount', 'Remarks'])
         # Data validation
         if s_sbj.empty or pv_cat.empty:
             print("No data found.")
@@ -206,8 +246,21 @@ class CSVProcessor:
             return carryover_df
 
         # Get the last day of the month and the first day of the next month
-        last_day_date, next_first_day_date = self.get_date_for_carryover(self.yearmonth + '01')
+        last_d, nxt_fst_d = self.get_date_for_carryover(self.yearmonth + '01')
 
+        equity = pv_cat.loc[0,'3']
+        netincome = pv_cat.loc[0,'6']
+
+        carryover_df = carryover_df.append({'Date': last_d, 'CategoryNum': '3', 'SubjectCode': '300', 'Amount': equity, 'Remarks': 'Carryover 300'}, ignore_index=True)
+        carryover_df = carryover_df.append({'Date': last_d, 'CategoryNum': '6', 'SubjectCode': '600', 'Amount': netincome, 'Remarks': 'Carryover 600'}, ignore_index=True)
+        s_sbj.loc[:,'Date'] = nxt_fst_d
+
+        for_carry = s_sbj[s_sbj['CategoryNum'].isin(['1','2'])]
+
+        carryover_df = pd.concat([carryover_df, for_carry], ignore_index=True)
+        carryover_df = carryover_df.fillna(0)
+        carryover_df = carryover_df.astype({'Amount': 'int32'})
+        return carryover_df
 
     def process_csv(self):
         """
