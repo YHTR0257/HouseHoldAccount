@@ -117,7 +117,6 @@ class TestCSVProcessor:
             s_sbj, pv_cat, pv_sbj = self.csv_processor.get_monthly_summary(test_data)
             test_m_df = self.csv_processor.get_carryover_data(s_sbj, pv_cat)
             test_m_df = self.csv_processor.fill_param(test_m_df)
-            print(test_m_df)
             test_df = pd.concat([test_df, test_m_df], ignore_index=True)
             test_df = self.csv_processor.fill_param(test_df)
             test_df = self.csv_processor.sort_csv(test_df)

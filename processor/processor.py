@@ -267,6 +267,10 @@ class CSVProcessor:
         CSVファイルの処理を行う
         すべてのメソッドはここで実行される
         """
+
+        cat_summary = pd.DataFrame()
+        sbj_summary = pd.DataFrame()
+
         datas = pd.read_csv(self.input_file)
         datas = datas.astype({
             'Date': 'str',
@@ -276,38 +280,28 @@ class CSVProcessor:
         })
 
         # 入力したデータを読み込んで処理を行う
-        datas = (datas.pipe(self.generate_id)
-                    .pipe(self.apply_subject_from_code)
-                    .pipe(self.sort_csv)
-                    .pipe(self.add_yearmonth_column)
-                    .pipe(self.remove_duplicates))
-        subject_summary = pd.DataFrame()
-        category_summary = pd.DataFrame()
+        datas = (datas.pipe(self.fill_param)
+                      .pipe(self.sort_csv)
+                      .pipe(self.remove_duplicates))
 
         for yearmonth in datas['YearMonth'].unique():
             self.yearmonth = yearmonth
             processdata = datas[datas['YearMonth'] == yearmonth]
-            sums_sbj, pv_cat, pv_sbj = self.get_monthly_summary(processdata)
-            datas = pd.concat([datas,carryover_datas],ignore_index=True)
-            datas = (datas.pipe(self.generate_id)
-                        .pipe(self.apply_subject_from_code)
-                        .pipe(self.sort_csv)
-                        .pipe(self.add_yearmonth_column)
-                        .pipe(self.remove_duplicates))
+            s_sbj, pv_cat, pv_sbj = self.get_monthly_summary(processdata)
+            carryover_data = self.get_carryover_data(s_sbj, pv_cat)
+            carryover_data = (carryover_data.pipe(self.fill_param)
+                                            .pipe(self.sort_csv))
+            datas = pd.concat([datas, carryover_data], ignore_index=True)
+            datas = datas.astype({'Amount': 'int32', 'Year': 'int32', 'Month': 'int32', 'YearMonth': 'str'})
+            cat_summary = pd.concat([cat_summary, pv_cat], ignore_index=True)
+            sbj_summary = pd.concat([sbj_summary, pv_sbj], ignore_index=True)
+            datas.reset_index(drop=True)
             print(f"Processing {yearmonth} completed.")
 
-        # Summaryの列を並び替え
-        summary_columns  = subject_summary.columns.tolist()
-        summary_columns.remove('YearMonth')
-        summary_columns.sort()
-        summary_columns.insert(0,'YearMonth')
-        subject_summary = subject_summary[summary_columns]
-
-        category_summary = category_summary[['YearMonth','TotalAssets','TotalLiabilities','TotalEquity','TotalIncome','TotalExpenses','NetIncome']]
-
-        summary = pd.merge(subject_summary,category_summary,on='YearMonth')
+        summary = pd.concat([cat_summary, sbj_summary], axis=1)
         summary = summary.fillna(0)
-        summary = summary.astype({col: int for col in summary.columns if col != 'YearMonth'})
+        unique_columns = sorted(set(summary.columns), key=lambda x: list(summary.columns).index(x))
+        summary = summary[unique_columns]
 
         # 処理されたデータを新しいCSVファイルに保存する
         datas.to_csv(self.output_file, index=False)
