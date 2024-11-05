@@ -300,8 +300,16 @@ class CSVProcessor:
 
         summary = pd.concat([cat_summary, sbj_summary], axis=1)
         summary = summary.fillna(0)
-        unique_columns = sorted(set(summary.columns), key=lambda x: list(summary.columns).index(x))
-        summary = summary[unique_columns]
+        cols = pd.Index(summary.columns)
+        cols = set(cols)
+        cols = sorted(cols)
+        cols = list(cols)
+        summary = summary[cols]
+
+        summary = summary.astype({'YearMonth': 'str'})
+        for col in summary.columns:
+            if col != 'YearMonth':
+                summary[col] = summary[col].astype('int32')
 
         # 処理されたデータを新しいCSVファイルに保存する
         datas.to_csv(self.output_file, index=False)
