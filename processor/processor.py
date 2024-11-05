@@ -134,7 +134,7 @@ class CSVProcessor:
             return None
         elif isinstance(date_str, dt.datetime):
             return date_str.strftime(output_format)
-        elif date_str.isdigit():
+        elif isinstance(date_str, int):
             date_str = str(date_str)
         elif not isinstance(date_str, str):
             date_str = str(date_str)

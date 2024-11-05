@@ -28,13 +28,15 @@ class TestCSVProcessor:
         }
         test_df = pd.DataFrame(test_data)
         actual_df = self.csv_processor.fill_param(test_df)
+        actual_df['Date'] = actual_df['Date'].astype('str')
         expected_data = {
-            'Date' : ['20240303', '20240303'],
+            'Date' : ['2024-03-03', '2024-03-03'],
             'SubjectCode' : ['200', '101'],
             'Amount' : ['-2000', '-2145'],
             'Remarks' : ['Starbucks 001', 'Tempura 002'],
             'Year' : ['2024', '2024'],
             'Month' : ['3', '3'],
+            'YearMonth' : ['202403', '202403'],
             'Subject' : ['Credit Card Debt', 'UFJ'],
             'CategoryName' : ['Liabilities', 'Assets'],
             'CategoryNum': ['2', '1'],
