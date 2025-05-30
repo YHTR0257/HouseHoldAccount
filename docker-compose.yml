@@ -1,0 +1,37 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:latest
+    container_name: postgres_container
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: mydb
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+  
+  app:
+    build:
+      context: ./docker/app
+    container_name: app
+    depends_on:
+      - db
+    volumes:
+      - .:/workspace
+      - ${SSH_AUTH_SOCK}:/ssh-agent  # SSHエージェントのソケットをマウント
+    working_dir: /workspace
+    environment:
+      SSH_AUTH_SOCK: /ssh-agent  # コンテナ側に環境変数を上書き
+      DB_HOST: db
+      DB_USER: user
+      DB_NAME: mydb
+      DB_PASSWORD: password
+    command: ["tail", "-f", "/dev/null"]
+    tty: true
+    stdin_open: true
+
+volumes:
+  db_data:
