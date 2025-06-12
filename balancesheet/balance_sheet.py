@@ -45,12 +45,15 @@ class BalanceSheet(csv_processor):
 
     def calculate_balances(self, processed_df):
         """
-        Calculate balances.
+        Calculate cumulative balances for assets, liabilities, income and
+        expenses.
 
         Args:
+            processed_df (pd.DataFrame): Pivoted DataFrame that contains
+            monthly totals for each subject code.
 
         Returns:
-            None
+            pd.DataFrame: DataFrame with running balance calculations applied.
         """
         asset_columns = [col for col in processed_df.columns if str(col).startswith('100')]
         liability_columns = [col for col in processed_df.columns if str(col).startswith('200')]
