@@ -156,8 +156,8 @@ class BalanceSheet(csv_processor):
         Returns:
             None
         """
-        pivotted_df = self.preprocess_and_pivot()
-        self.calculate_balances(pivotted_df)
+        pivoted_df = self.preprocess_and_pivot()
+        self.calculate_balances(pivoted_df)
         self.show_summary()
         self.carryover_data()
         self.save_summary(output_file_path)
