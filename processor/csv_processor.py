@@ -69,10 +69,10 @@ class CSVProcessor:
         Returns:
             dataframe: Dataframe with 'Year' and 'Month' columns added
         """
-        df['Date']=pd.to_datetime(df['Date'])
-        df['Year']=df['Date'].dt.year
-        df['Month']=df['Date'].dt.month
-        df['YearMonth'] = df['Date'].str[:7]
+        df['Date'] = pd.to_datetime(df['Date'])
+        df['Year'] = df['Date'].dt.year
+        df['Month'] = df['Date'].dt.month
+        df['YearMonth'] = df['Date'].dt.strftime('%Y-%m')
         return df
 
     def apply_subject_from_code(self,df):
@@ -81,7 +81,7 @@ class CSVProcessor:
         Returns:
             dataframe: Dataframe with 'Subject' columns added as string
         """
-        df['Subject'] = df.apply(lambda data: self.find_by_id(self.code_file, data['SubjectCode'], axis=1))
+        df['Subject'] = df.apply(lambda row: self.find_by_id(row['SubjectCode']), axis=1)
         return df
 
     def find_by_id(self, search_id):
